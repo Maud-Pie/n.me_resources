@@ -3,7 +3,7 @@
 // @namespace   Violentmonkey Scripts
 // @match       https://nekto.me/audiochat*
 // @grant       none
-// @version     1.0
+// @version     1.1
 // @author      -
 // @description 6/3/2023, 2:04:02 AM
 // @icon        https://nekto.me/audiochat/favicon.ico
@@ -56,6 +56,7 @@
       log('found audio shitty print', args[0])
       audio.volume = 0.2
     }
+    alert(123)
     return audio
   }
 
