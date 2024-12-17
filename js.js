@@ -32,9 +32,6 @@
 	let _console_log = unsafeWindow.console.log
 	let log = _console_log
 
-	const pathCallButton = '/html/body/div[2]/div[2]/div[3]/div[1]/div[4]/div[5]/div/div[2]/button[1]'
-	const pathEndCallDialog = '/html/body/div[7]/div'
-
 
 	unsafeWindow.console.log = (...args) => {
 		// _console_log(...args)
@@ -79,23 +76,34 @@
 		const code = event.code;
 		if(code == keyDialogStopNext){
 			event.stopImmediatePropagation()
-			const callbutton = getElementByXpath(pathCallButton)
+			const callbutton = document.querySelector('.stop-talk-button')
 			callbutton.click()
 		}
 	})
 
-	document.addEventListener('keypress', async (event) => {
-		const code = event.code;
-		if(code == keyDialogStopNext){
-			event.stopImmediatePropagation()
-			const endCallDialog = getElementByXpath(pathEndCallDialog)
-			if(endCallDialog){
-				const endCallButton = endCallDialog.childNodes[2].childNodes[1]
-				endCallButton.click()
-				return
-			}
+  VM.observe(unsafeWindow.document, () => {
+		const node = unsafeWindow.document.querySelector('.swal2-confirm')
+		if (node){
+			node.click()
 		}
 	})
+
+
+	// document.addEventListener('keypress', async (event) => {
+	// 	const code = event.code;
+	// 	if(code == keyDialogStopNext){
+	// 		event.stopImmediatePropagation()
+	// 		const endCallDialog = document.querySelector('swal2-confirm')
+	// 		if(endCallDialog){
+	// 			const endCallButton = endCallDialog.childNodes[2].childNodes[1]
+	// 			endCallButton.click()
+	// 			return
+	// 		}
+	// 	}
+	// })
+
+
+  document.querySelector('swal2-confirm')
 
 	const styles = `
 		.mute_spy_on{
