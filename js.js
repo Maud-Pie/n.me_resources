@@ -3,11 +3,10 @@
 // @namespace   Violentmonkey Scripts
 // @match       https://nekto.me/audiochat*
 // @grant       none
-// @version     1.1
+// @version     1.2
 // @author      -
 // @description 6/3/2023, 2:04:02 AM
 // @icon        https://nekto.me/audiochat/favicon.ico
-// @updateURL   https://raw.githubusercontent.com/Maud-Pie/n.me_resources/refs/heads/main/js.js
 // @downloadURL https://raw.githubusercontent.com/Maud-Pie/n.me_resources/refs/heads/main/js.js
 // @run-at      document-start
 // @inject-into page
@@ -56,7 +55,6 @@
       log('found audio shitty print', args[0])
       audio.volume = 0.2
     }
-    alert(123)
     return audio
   }
 
