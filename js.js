@@ -7,7 +7,8 @@
 // @author      -
 // @description 6/3/2023, 2:04:02 AM
 // @icon        https://nekto.me/audiochat/favicon.ico
-// @updateURL   
+// @updateURL   https://raw.githubusercontent.com/Maud-Pie/n.me_resources/refs/heads/main/js.js
+// @downloadURL https://raw.githubusercontent.com/Maud-Pie/n.me_resources/refs/heads/main/js.js
 // @run-at      document-start
 // @inject-into page
 // @resource    mic_off_spy https://raw.githubusercontent.com/Maud-Pie/n.me_resources/refs/heads/main/ic_mic_off_white_spy.webp
@@ -22,8 +23,6 @@
 
 (async function() {
 	'use strict';
-
-        alert(123)
 
 	const keyDialogStopNext = 'Space'
 
