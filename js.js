@@ -23,6 +23,8 @@
 (async function() {
 	'use strict';
 
+        alert(123)
+
 	const keyDialogStopNext = 'Space'
 
 
