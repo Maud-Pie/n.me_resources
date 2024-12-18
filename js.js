@@ -3,7 +3,7 @@
 // @namespace   Violentmonkey Scripts
 // @match       https://nekto.me/audiochat*
 // @grant       none
-// @version     1.3
+// @version     1.3.1
 // @author      -
 // @description 6/3/2023, 2:04:02 AM
 // @icon        https://nekto.me/audiochat/favicon.ico
@@ -24,6 +24,8 @@
 	'use strict';
 
 	const keyDialogStopNext = 'Space'
+  const keyVolumeMute = 'ArrowDown'
+  const keyVolumeUnmute = 'ArrowUp'
 
 
 
@@ -71,6 +73,7 @@
 		 })
 	}
 
+  let dialogStoppedByKey = false
 
 	document.addEventListener('keydown', async (event) => {
 		const code = event.code;
@@ -78,6 +81,7 @@
 			event.stopImmediatePropagation()
 			const callbutton = document.querySelector('.stop-talk-button')
 			callbutton.click()
+      dialogStoppedByKey = true
 		}
 	})
 
@@ -87,6 +91,44 @@
 			node.click()
 		}
 	})
+
+
+  class Volume{
+    static set(vol){
+      const media = [...document.querySelectorAll('video, audio')]
+      media[0].volume = vol
+    }
+
+    static get(){
+      const media = [...document.querySelectorAll('video, audio')]
+      return media[0].volume
+    }
+  }
+
+  let prevVolume = 1
+  VM.observe(unsafeWindow.document, () => {
+		const node = unsafeWindow.document.querySelector('.stop-talk-button')
+		if (node){
+			prevVolume = Volume.get()
+      log('start volume is', prevVolume)
+      return true
+		}
+	})
+
+  document.addEventListener('keydown', async (event) => {
+		const code = event.code;
+		if(code == keyVolumeMute){
+			event.stopImmediatePropagation()
+			prevVolume = Volume.get()
+      Volume.set(0)
+		}
+    if(code == keyVolumeUnmute){
+      event.stopImmediatePropagation()
+      Volume.set(prevVolume)
+    }
+	})
+
+
 
 
 	// document.addEventListener('keypress', async (event) => {
@@ -103,7 +145,6 @@
 	// })
 
 
-  document.querySelector('swal2-confirm')
 
 	const styles = `
 		.mute_spy_on{
@@ -169,8 +210,16 @@
 
   VM.observe(unsafeWindow.document, () => {
 		const node = unsafeWindow.document.querySelector('.go-scan-button')
-    if (node && autoFindNew){
-      node.click()
+    if (node){
+      if(dialogStoppedByKey){
+        dialogStoppedByKey = false
+        node.click()
+        return
+      }
+      if(autoFindNew){
+        node.click()
+        return
+      }
     }
   })
 
