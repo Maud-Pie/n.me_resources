@@ -3,7 +3,7 @@
 // @namespace   Violentmonkey Scripts
 // @match       https://nekto.me/audiochat*
 // @grant       none
-// @version     1.3.1
+// @version     1.3.2
 // @author      -
 // @description 6/3/2023, 2:04:02 AM
 // @icon        https://nekto.me/audiochat/favicon.ico
@@ -74,15 +74,23 @@
 	}
 
   let dialogStoppedByKey = false
-
 	document.addEventListener('keydown', async (event) => {
 		const code = event.code;
 		if(code == keyDialogStopNext){
 			event.stopImmediatePropagation()
-			const callbutton = document.querySelector('.stop-talk-button')
-			callbutton.click()
-      dialogStoppedByKey = true
-		}
+			const stopTalkButton = document.querySelector('.stop-talk-button')
+      if(stopTalkButton){
+        stopTalkButton.click()
+        dialogStoppedByKey = true
+      }
+
+      const goScanButton = unsafeWindow.document.querySelector('.go-scan-button')
+      if(goScanButton){
+        goScanButton.click()
+        dialogStoppedByKey = false
+      }
+      return
+      }
 	})
 
   VM.observe(unsafeWindow.document, () => {
@@ -275,10 +283,10 @@
   }
 
   function onSend(msg){
-    if(msg[1].type == 'web-agent'){
-      log('blocked collection info (web agent)')
-      return true
-    }
+    // if(msg[1].type == 'web-agent'){
+    //   log('blocked collection info (web agent)')
+    //   return true
+    // }
     if(msg[1].type == 'set-fpt'){
       log('blocked collection info (font-data)')
       return true
