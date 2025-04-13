@@ -3,7 +3,7 @@
 // @namespace   Violentmonkey Scripts
 // @match       https://nekto.me/audiochat*
 // @grant       none
-// @version     1.3.2
+// @version     1.4.0
 // @author      -
 // @description 6/3/2023, 2:04:02 AM
 // @icon        https://nekto.me/audiochat/favicon.ico
@@ -29,15 +29,36 @@
 
 
 
-
-
 	let _console_log = unsafeWindow.console.log
 	let log = _console_log
+
+
+
+
+
+
 
 
 	unsafeWindow.console.log = (...args) => {
 		// _console_log(...args)
 	}
+
+
+
+//   let nativeAddEventListener = unsafeWindow.document.addEventListener
+
+//   unsafeWindow.document.addEventListener = function(...args){
+//     log('adde', ...args)
+//     if(args[0] == 'visibilitychange' | args[0] == 'mouseleave'){
+//       log('blocked vis change')
+//       return
+//     }
+//     return nativeAddEventListener(...args)
+//   }
+
+//   document.addEventListener("visibilitychange", () => {
+//     log('me', document.visibilityState)
+//   });
 
   // const nativeGetUserMedia = unsafeWindow.navigator.mediaDevices.getUserMedia
   // unsafeWindow.navigator.mediaDevices.getUserMedia = function(...args){
@@ -48,11 +69,11 @@
 
   const nativeAudio = unsafeWindow.Audio
   unsafeWindow.Audio = function(...args){
-    // log('audio', ...args)
+    // log('audio', args)
     const audio = new nativeAudio(...args)
-    if (args[0].includes('connect.mp3')){
+    if (args.length == 1 && args[0].includes('connect.mp3')){
       log('found audio shitty print', args[0])
-      audio.volume = 0.2
+      audio.volume = 0.1
     }
     return audio
   }
@@ -272,21 +293,30 @@
     return [ws, _sendJson]
   }
 
+  let block = false
+
   function onMessage(msg){
     const _conId = msg[1].connectionId
     if(_conId){
       log('found connection id', _conId)
       conId = _conId
     }
+    // if(msg[1].type == 'peer-connect'){
+    //   block = true
+    //   log('peeeeeer', msg)
+    // }
 
     // log('recived', msg)
   }
+
+
 
   function onSend(msg){
     // if(msg[1].type == 'web-agent'){
     //   log('blocked collection info (web agent)')
     //   return true
     // }
+    if(block){return true}
     if(msg[1].type == 'set-fpt'){
       log('blocked collection info (font-data)')
       return true
@@ -312,6 +342,82 @@
 	}
 
 
+  // document.querySelectorAll('.mute-button:not(#mute_button_spy)')
+
+
+
+
+
+    // muted
+  // ss.getAudioTracks()[0].enabled = true
+  // let _getUserMedia = unsafeWindow.navigator.mediaDevices.getUserMedia
+  let micStream
+  let _getUserMedia = unsafeWindow.navigator.mediaDevices.getUserMedia.bind(unsafeWindow.navigator.mediaDevices);
+  unsafeWindow.navigator.mediaDevices.getUserMedia = (...args) => {
+    return _getUserMedia(...args)
+      .then(stream => {
+        log("stream", stream)
+        micStream = stream.getAudioTracks()[0]
+        return stream
+      })
+  }
+
+
+
+  class ForceMuteButton{
+		constructor(ogClassname, onToggle){
+      this.ogClassname = ogClassname
+      this.onToggle = onToggle
+
+			this.startObserver()
+		}
+
+		create(){
+      if (this.event){ return }
+      // log('forcemutebutton event created')
+      let e = (event)=>{
+        log('eeee event')
+        event.preventDefault()
+        event.stopImmediatePropagation()
+        const button = event.target
+        this.onToggle(!button.classList.contains('muted'))
+        button.classList.toggle('muted')
+			}
+      this.ogButton.onclick = undefined
+			this.ogButton.addEventListener('click', e, true)
+			this.event = e
+		}
+
+    remove(){
+      if (!this.event){ return }
+      // log('forcemutebutton event removed')
+
+      // this.ogButton.removeEventListener(click, this.event)
+      this.event = undefined
+    }
+
+		startObserver(){
+			this.disconnectObserver = VM.observe(unsafeWindow.document, () => {
+				this.ogButton = document.querySelector(this.ogClassname)
+
+				if (this.ogButton) {
+					this.create()
+				}
+				else{
+          this.remove()
+				}
+			});
+		}
+  }
+
+
+  let forceMuteButton = new ForceMuteButton(
+    '.mute-button:not(#mute_button_spy)',
+    (isMuted)=>{
+      console.log("force mute to", isMuted)
+      micStream.enabled = !isMuted
+    }
+  )
 
 
 	const htmlFakeMuteButton = `<button type="button" id="mute_button_spy" class="mute-button mute_spy_on"></button>`
