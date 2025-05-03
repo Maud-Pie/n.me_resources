@@ -3,7 +3,7 @@
 // @namespace   Violentmonkey Scripts
 // @match       https://nekto.me/audiochat*
 // @grant       none
-// @version     1.5.0
+// @version     1.5.1
 // @author      -
 // @description 6/3/2023, 2:04:02 AM
 // @icon        https://nekto.me/audiochat/favicon.ico
@@ -663,13 +663,13 @@
     `
       :root {
         --theme-primary: #594d7f;
-        --night-active-checkbox-background-color: var(--theme-primary);
-        --night-active-checkbox-border-color: var(--theme-primary);
-        --night-active-talk-color: var(--theme-primary);
-        --night-background-color: #101010;
-        --night-header-text-color: var(--theme-primary);
-        --night-header-border-color: var(--theme-primary);
-        --night-header-background-color: #171717;
+        --night-active-checkbox-background-color: var(--theme-primary) !important;
+        --night-active-checkbox-border-color: var(--theme-primary) !important;
+        --night-active-talk-color: var(--theme-primary) !important;
+        --night-background-color: #101010 !important;
+        --night-header-text-color: var(--theme-primary) !important;
+        --night-header-border-color: var(--theme-primary) !important;
+        --night-header-background-color: #171717 !important;
       }
       .navbar {
           background: var(--theme-primary) !important;
@@ -681,7 +681,7 @@
       }
 
       .audio-chat .header .chat {
-          color: var(--theme-primary);
+          color: var(--theme-primary) !important;
           font-weight: bold;
           font-size: 15px ! important;
           display: inline ! important;
@@ -694,8 +694,7 @@
           background-color: var(--theme-primary) !important;
       }
       .volume_slider .slider-piecewise {
-          background-color: color-mix(in srgb, var(--night-active-checkbox-border-color), rgb(255,255,255) 20%);
-          border-radius: 2px;
+          background-color: color-mix(in srgb, var(--night-active-checkbox-border-color), rgb(255,255,255) 20%) !important;
       }
     `
   )
@@ -704,107 +703,107 @@
 
 
   // https://codepen.io/bennettfeely/pen/vYLmYJz
-  themeController.defineTheme(
-    'purple-stars',
-    'Фиолетовое небо',
-    'night',
-    `
-      <button class="btn btn-default">Фиолетовое небо</button>
-    `,
-    `
-      :root {
-        --theme-primary: #594d7f;
-        --night-active-checkbox-background-color: var(--theme-primary);
-        --night-active-checkbox-border-color: var(--theme-primary);
-        --night-active-talk-color: var(--theme-primary);
-        --night-background-color: #101010;
-        --night-header-text-color: var(--theme-primary);
-        --night-header-border-color: var(--theme-primary);
-        --night-header-background-color: #171717;
-      }
-      .navbar {
-          background: var(--theme-primary) !important;
-      }
+//   themeController.defineTheme(
+//     'purple-stars',
+//     'Фиолетовое небо',
+//     'night',
+//     `
+//       <button class="btn btn-default">Фиолетовое небо</button>
+//     `,
+//     `
+//       :root {
+//         --theme-primary: #594d7f;
+//         --night-active-checkbox-background-color: var(--theme-primary);
+//         --night-active-checkbox-border-color: var(--theme-primary);
+//         --night-active-talk-color: var(--theme-primary);
+//         --night-background-color: #101010;
+//         --night-header-text-color: var(--theme-primary);
+//         --night-header-border-color: var(--theme-primary);
+//         --night-header-background-color: #171717;
+//       }
+//       .navbar {
+//           background: var(--theme-primary) !important;
+//       }
 
-      div.outer-container {
-        width: 100% !important;
-        margin: 0% !important;
-      }
+//       div.outer-container {
+//         width: 100% !important;
+//         margin: 0% !important;
+//       }
 
-      .audio-chat .header .chat {
-          color: var(--theme-primary);
-          font-weight: bold;
-          font-size: 15px ! important;
-          display: inline ! important;
-      }
+//       .audio-chat .header .chat {
+//           color: var(--theme-primary);
+//           font-weight: bold;
+//           font-size: 15px ! important;
+//           display: inline ! important;
+//       }
 
-      .volume_slider .slider-dot {
-          background-color: var(--theme-primary) !important;
-      }
-      .volume_slider .slider-process {
-          background-color: var(--theme-primary) !important;
-      }
-      .volume_slider .slider-piecewise {
-          background-color: color-mix(in srgb, var(--night-active-checkbox-border-color), rgb(255,255,255) 20%);
-          border-radius: 2px;
-      }
-
-
-      :root {
-        --twinkle-duration: 4s;
-      }
-
-      .stars-wrapper {
-        position: relative;
-        pointer-events: none;
-        width: 100vw;
-        height: 100vh;
-        background: rgb(0,0,0);
-        overflow: hidden;
-      }
-
-      .stars {
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        animation: twinkle var(--twinkle-duration) ease-in-out infinite;
-
-        &:nth-child(2) {
-          animation-delay: calc(var(--twinkle-duration) * -0.33);
-        }
-        &:nth-child(3) {
-          animation-delay: calc(var(--twinkle-duration) * -0.66);
-        }
-
-        @keyframes twinkle {
-          25% {
-            opacity: 0;
-          }
-        }
-      }
-
-      .star {
-        fill: white;
-
-        &:nth-child(3n) {
-          opacity: 0.8;
-        }
-        &:nth-child(7n) {
-          opacity: 0.6;
-        }
-        &:nth-child(13n) {
-          opacity: 0.4;
-        }
-        &:nth-child(19n) {
-          opacity: 0.2;
-        }
-      }
+//       .volume_slider .slider-dot {
+//           background-color: var(--theme-primary) !important;
+//       }
+//       .volume_slider .slider-process {
+//           background-color: var(--theme-primary) !important;
+//       }
+//       .volume_slider .slider-piecewise {
+//           background-color: color-mix(in srgb, var(--night-active-checkbox-border-color), rgb(255,255,255) 20%);
+//           border-radius: 2px;
+//       }
 
 
-    `
-  )
+//       :root {
+//         --twinkle-duration: 4s;
+//       }
+
+//       .stars-wrapper {
+//         position: relative;
+//         pointer-events: none;
+//         width: 100vw;
+//         height: 100vh;
+//         background: rgb(0,0,0);
+//         overflow: hidden;
+//       }
+
+//       .stars {
+//         position: absolute;
+//         top: 0;
+//         left: 0;
+//         right: 0;
+//         bottom: 0;
+//         animation: twinkle var(--twinkle-duration) ease-in-out infinite;
+
+//         &:nth-child(2) {
+//           animation-delay: calc(var(--twinkle-duration) * -0.33);
+//         }
+//         &:nth-child(3) {
+//           animation-delay: calc(var(--twinkle-duration) * -0.66);
+//         }
+
+//         @keyframes twinkle {
+//           25% {
+//             opacity: 0;
+//           }
+//         }
+//       }
+
+//       .star {
+//         fill: white;
+
+//         &:nth-child(3n) {
+//           opacity: 0.8;
+//         }
+//         &:nth-child(7n) {
+//           opacity: 0.6;
+//         }
+//         &:nth-child(13n) {
+//           opacity: 0.4;
+//         }
+//         &:nth-child(19n) {
+//           opacity: 0.2;
+//         }
+//       }
+
+
+//     `
+//   )
 
   themeController.defineTheme(
     'green',
@@ -816,13 +815,13 @@
     `
       :root {
         --theme-primary: #123311;
-        --night-active-checkbox-background-color: var(--theme-primary);
-        --night-active-checkbox-border-color: var(--theme-primary);
-        --night-active-talk-color: var(--theme-primary);
-        --night-background-color: #101010;
-        --night-header-text-color: var(--theme-primary);
-        --night-header-border-color: var(--theme-primary);
-        --night-header-background-color: color-mix(in srgb, var(--theme-primary), rgb(255,255,255) 20%);
+        --night-active-checkbox-background-color: var(--theme-primary) !important;
+        --night-active-checkbox-border-color: var(--theme-primary) !important;
+        --night-active-talk-color: var(--theme-primary) !important;
+        --night-background-color: #101010 !important;
+        --night-header-text-color: var(--theme-primary) !important;
+        --night-header-border-color: var(--theme-primary) !important;
+        --night-header-background-color: #171717 !important;
       }
       .navbar {
           background: var(--theme-primary) !important;
@@ -834,7 +833,7 @@
       }
 
       .audio-chat .header .chat {
-          color: var(--theme-primary);
+          color: var(--theme-primary) !important;
           font-weight: bold;
           font-size: 15px ! important;
           display: inline ! important;
@@ -847,8 +846,7 @@
           background-color: var(--theme-primary) !important;
       }
       .volume_slider .slider-piecewise {
-          background-color: color-mix(in srgb, var(--night-active-checkbox-border-color), rgb(255,255,255) 20%);
-          border-radius: 2px;
+          background-color: color-mix(in srgb, var(--night-active-checkbox-border-color), rgb(255,255,255) 20%) !important;
       }
     `
   )
