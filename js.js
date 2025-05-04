@@ -3,7 +3,7 @@
 // @namespace   Violentmonkey Scripts
 // @match       https://nekto.me/audiochat*
 // @grant       none
-// @version     1.5.1
+// @version     1.5.2
 // @author      -
 // @description 6/3/2023, 2:04:02 AM
 // @icon        https://nekto.me/audiochat/favicon.ico
@@ -53,7 +53,7 @@
     const audio = new nativeAudio(...args)
     if (args.length == 1 && args[0].includes('connect.mp3')){
       log('found audio shitty print', args[0])
-      audio.volume = 0.0
+      audio.volume = 0.1
     }
     return audio
   }
@@ -1241,7 +1241,7 @@
   )
 
 	styles.queue(
-		`mute_spy_on{
+		`.mute_spy_on{
 			background-image: url(${GM_getResourceURL('mic_on_spy')}) !important;
 		}
 
