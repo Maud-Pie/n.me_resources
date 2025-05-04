@@ -82,9 +82,9 @@ function getSpacepack(chunkObject, logSuccess = false) {
     function spacepack(module, exports, webpackRequire) {
         if (logSuccess) {
             if (!chunkObject) {
-                console.log("[wpTools] spacepack loaded");
+                console.log("[wpTools] spacepack loaded with no chunk");
             } else {
-                console.log("[wpTools] spacepack loaded i" + chunkObject);
+                console.log("[wpTools] spacepack loaded into " + chunkObject);
             }
         }
         function findByExports(keysArg) {
@@ -191,11 +191,6 @@ function getSpacepack(chunkObject, logSuccess = false) {
 }
 
 
-const chunkObjectName = 'webpackJsonp'
-
-
-
-
 
 var onChunkLoaded = function(webpackRequire) {
     webpackRequire("spacepack");
@@ -219,9 +214,6 @@ onChunkLoaded[Symbol.iterator] = function() {
         }
     };
 };
-
-const chunkObject = unsafeWindow[chunkObjectName]
-
 
 function pushSpacepack(chunkObject){
   chunkObject.push([
