@@ -2,7 +2,7 @@
 // @name        nektomi [Ultima]
 // @match       https://nekto.me/audiochat*
 // @grant       none
-// @version     1.5.3.1
+// @version     1.5.3.2
 // @author      -
 // @description 6/3/2023, 2:04:02 AM
 // @namespace   ultima
@@ -50,10 +50,10 @@
 
 
 
-  let r = GM_xmlhttpRequest({
-    url: 'https://raw.githubusercontent.com/Maud-Pie/n.me_resources/refs/heads/main/js.js',
-    onload: (e) => {log(e.responseText)}
-  })
+  // let r = GM_xmlhttpRequest({
+  //   url: 'https://raw.githubusercontent.com/Maud-Pie/n.me_resources/refs/heads/main/js.js',
+  //   onload: (e) => {log(e.responseText)}
+  // })
 
   // log(await r)
 
@@ -184,6 +184,7 @@
       document.addEventListener('keydown', async (event) => {
         const code = event.code;
         if(code == keyDialogStopNext){
+          event.preventDefault()
           event.stopImmediatePropagation()
 
           if(this.vue.activeConnectionId){
@@ -427,6 +428,32 @@
         float: unset !important;
       }
 
+      input.ultima[type="checkbox"] {
+        accent-color: var(--night-active-checkbox-background-color);
+        transform: scale(1.3);
+        margin: 10px;
+      }
+
+      input.ultima[type="checkbox"]:focus {
+        outline: none;
+      }
+
+      label.ultima {
+        font-size: medium;
+      }
+
+      div.chat-step.idle > div:nth-child(2) > div:nth-child(3) {
+        display: none !important;
+      }
+
+      div.description {
+        display: none !important;
+      }
+
+      div.outer-container.with_tabs {
+        height: 100%;
+      }
+
     `
 
 
@@ -441,12 +468,23 @@
       styles.queue(this.css)
     }
 
-    addCheckbox(html, callback){
+    addCheckbox(label, callback){
       this.waitToApply.push(()=>{
         const settings = unsafeWindow.document.querySelector('#settingsDropdown')
         const temp = document.createElement('div')
+        const html = `
+          <div>
+            <label class="ultima">${label}</label>
+            <input class="ultima" type="checkbox">
+          </div>
+        `
         temp.innerHTML = html.trim()
         const newElement = temp.firstElementChild
+        const _callback = (event)=>{
+          event.preventDefault()
+          event.target.blur()
+          return callback(event)
+        }
         newElement.addEventListener('change', callback)
         settings.appendChild(newElement)
       })
@@ -480,23 +518,15 @@
 
   const settingsController = new SettingsController()
   settingsController.addCheckbox(
-    `<div>
-      <label>auto find new</label>
-      <input type="checkbox">
-    </div>`,
+    'auto find new',
     (event)=>{
-      event.preventDefault()
       settingsController.autoFindNew = event.target.checked
       // log('changed', settingsController.autoFindNew)
 
   })
   settingsController.addCheckbox(
-    `<div>
-      <label>gain volume</label>
-      <input type="checkbox">
-    </div>`,
+    'gain volume',
     (event)=>{
-      event.preventDefault()
       settingsController.gainVolume = event.target.checked
       // log('changed2', settingsController.gainVolume)
   })
@@ -679,6 +709,8 @@
         --night-active-checkbox-background-color: var(--theme-primary) !important;
         --night-active-checkbox-border-color: var(--theme-primary) !important;
         --night-active-talk-color: var(--theme-primary) !important;
+        --night-link-color: var(--theme-primary) !important;
+        --night-button-stop-color: var(--theme-primary) !important;
         --night-background-color: #101010 !important;
         --night-header-text-color: var(--theme-primary) !important;
         --night-header-border-color: var(--theme-primary) !important;
