@@ -2,7 +2,7 @@
 // @name        nektomi [Ultima]
 // @match       https://nekto.me/audiochat*
 // @grant       none
-// @version     1.5.3.3
+// @version     1.5.3.4
 // @author      -
 // @description 6/3/2023, 2:04:02 AM
 // @namespace   ultima
@@ -371,7 +371,7 @@
   class SettingsController{
     html = `
      <div class="dropdown">
-      <button class="settings-toggle">Ultima settings</button>
+      <button class="settings-toggle">Settings</button>
       <div id="settingsDropdown" class="dropdown-content">
 
       </div>
@@ -494,7 +494,11 @@
     injectWhenReady(){
       VM.observe(unsafeWindow.document, () => {
         const node = unsafeWindow.document.querySelector('div.navbar-header')
+
         if (node){
+          const brand = node.querySelector('.navbar-brand')
+          // log('brand', brand)
+          brand.innerHTML = 'Nekto.me [Ultima]'
           node.insertAdjacentHTML("beforeend", this.html)
           const settingsDropdown = node.querySelector('#settingsDropdown')
           const toggleButton = node.querySelector('.settings-toggle')
