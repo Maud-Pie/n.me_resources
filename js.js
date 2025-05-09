@@ -2,7 +2,7 @@
 // @name        nektomi [Ultima]
 // @match       https://nekto.me/audiochat*
 // @grant       none
-// @version     1.5.3.2
+// @version     1.5.3.3
 // @author      -
 // @description 6/3/2023, 2:04:02 AM
 // @namespace   ultima
@@ -530,6 +530,13 @@
       settingsController.gainVolume = event.target.checked
       // log('changed2', settingsController.gainVolume)
   })
+  settingsController.addCheckbox(
+    'mic off on new',
+    (event)=>{
+      settingsController.autoMute = event.target.checked
+      // log('changed2', settingsController.gainVolume)
+  })
+
   settingsController.injectWhenReady()
 
 
@@ -740,6 +747,10 @@
       }
       .volume_slider .slider-piecewise {
           background-color: color-mix(in srgb, var(--night-active-checkbox-border-color), rgb(255,255,255) 20%) !important;
+      }
+
+      .mute-button.muted {
+        background-color: var(--theme-primary) !important;
       }
     `
   )
@@ -1180,14 +1191,17 @@
 
 		create(){
       if (this.event){ return }
+      if (settingsController.autoMute){
+        this.onToggle(!this.ogButton.classList.contains('muted'))
+      }
       // log('forcemutebutton event created')
       let e = (event)=>{
         log('eeee event')
         event.preventDefault()
         event.stopImmediatePropagation()
-        const button = event.target
-        this.onToggle(!button.classList.contains('muted'))
-        button.classList.toggle('muted')
+        // const button = event.target
+        this.onToggle(!this.ogButton.classList.contains('muted'))
+        // button.classList.toggle('muted')
 			}
       this.ogButton.onclick = undefined
 			this.ogButton.addEventListener('click', e, true)
@@ -1222,6 +1236,7 @@
     (isMuted)=>{
       console.log("force mute to", isMuted)
       micStream.enabled = !isMuted
+      forceMuteButton.ogButton.classList.toggle('muted')
     }
   )
 
