@@ -2,7 +2,7 @@
 // @name        nektomi [Ultima]
 // @match       https://nekto.me/audiochat*
 // @grant       none
-// @version     1.5.3
+// @version     1.5.3.1
 // @author      -
 // @description 6/3/2023, 2:04:02 AM
 // @namespace   ultima
@@ -485,6 +485,7 @@
       <input type="checkbox">
     </div>`,
     (event)=>{
+      event.preventDefault()
       settingsController.autoFindNew = event.target.checked
       // log('changed', settingsController.autoFindNew)
 
@@ -495,6 +496,7 @@
       <input type="checkbox">
     </div>`,
     (event)=>{
+      event.preventDefault()
       settingsController.gainVolume = event.target.checked
       // log('changed2', settingsController.gainVolume)
   })
@@ -649,7 +651,6 @@
             const themeButton = div.querySelector(':nth-last-child(1)')
             // log('last', themeButton)
             themeButton.addEventListener('click', (event) => {
-              event.preventDefault()
               this.set(name)
               themeButton.classList.toggle('checked')
             })
