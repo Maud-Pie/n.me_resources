@@ -1,11 +1,13 @@
 // ==UserScript==
 // @name        nektomi [Ultima]
-// @namespace   Violentmonkey Scripts
 // @match       https://nekto.me/audiochat*
 // @grant       none
-// @version     1.5.2
+// @version     1.5.3
 // @author      -
 // @description 6/3/2023, 2:04:02 AM
+// @namespace   ultima
+// @supportURL  -
+// @homepageURL -
 // @icon        https://nekto.me/audiochat/favicon.ico
 // @downloadURL https://raw.githubusercontent.com/Maud-Pie/n.me_resources/refs/heads/main/js.js
 // @run-at      document-start
@@ -21,6 +23,7 @@
 // @grant       GM_addStyle
 // @grant       GM_getValue
 // @grant       GM_setValue
+// @grant       GM_xmlhttpRequest
 // ==/UserScript==
 
 
@@ -44,6 +47,15 @@
 		// _console_log(...args)
 	}
   unsafeWindow.log = log
+
+
+
+  let r = GM_xmlhttpRequest({
+    url: 'https://raw.githubusercontent.com/Maud-Pie/n.me_resources/refs/heads/main/js.js',
+    onload: (e) => {log(e.responseText)}
+  })
+
+  // log(await r)
 
 
 
@@ -637,7 +649,7 @@
             const themeButton = div.querySelector(':nth-last-child(1)')
             // log('last', themeButton)
             themeButton.addEventListener('click', (event) => {
-              // log('click', name)
+              event.preventDefault()
               this.set(name)
               themeButton.classList.toggle('checked')
             })
@@ -995,7 +1007,7 @@
 
       // gainNode.gain.linearRampToValueAtTime(scaledGain, context.currentTime + 0.05)
 
-      let hahG = 1 - volume * 2
+      let hahG = 1 - volume * 3
       hahG = Math.max(0, hahG)
 
       if(settingsController.gainVolume){
