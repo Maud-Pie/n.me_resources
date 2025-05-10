@@ -2,7 +2,7 @@
 // @name        nektomi [Ultima]
 // @match       https://nekto.me/audiochat*
 // @grant       none
-// @version     1.5.3.4
+// @version     1.5.4.0
 // @author      -
 // @description 6/3/2023, 2:04:02 AM
 // @namespace   ultima
@@ -56,6 +56,23 @@
   // })
 
   // log(await r)
+
+
+//     let nativeAddEventListener = unsafeWindow.document.addEventListener
+
+// 	  unsafeWindow.document.addEventListener = function(...args){
+// 	    log('adde', ...args)
+// 	    if(args[0] == 'visibilitychange' | args[0] == 'mouseleave'){
+// 	      log('blocked vis change')
+// 	      return
+// 	    }
+// 	    return nativeAddEventListener(...args)
+// 	  }
+
+
+// 	  document.addEventListener("visibilitychange", () => {
+// 	    log('visibilitychange to', document.visibilityState)
+// 	  });
 
 
 
@@ -373,7 +390,6 @@
      <div class="dropdown">
       <button class="settings-toggle">Settings</button>
       <div id="settingsDropdown" class="dropdown-content">
-
       </div>
     </div>
     `
@@ -454,6 +470,10 @@
         height: 100%;
       }
 
+      div.talking {
+          font-size: large;
+      }
+
     `
 
 
@@ -474,6 +494,7 @@
         const temp = document.createElement('div')
         const html = `
           <div>
+<!--             <div id="settingsDropdown2" class="dropdown-content">bow</div> -->
             <label class="ultima">${label}</label>
             <input class="ultima" type="checkbox">
           </div>
@@ -557,12 +578,12 @@
 
     }
 
-    defineTheme(name, prettyName, based, buttonHTML, css){
+    defineTheme(name, prettyName, based, buttonHTML, css, template=''){
       this.themes[name] = {
         prettyName: prettyName,
         based: based,
         buttonHTML: buttonHTML,
-        css: css
+        css: template+css
       }
     }
 
@@ -705,27 +726,15 @@
   }
 
   const themeController = new ThemeController()
-
-
-  themeController.defineTheme(
-    'purple',
-    'Фиолетовая',
-    'night',
-    `
-      <button class="btn btn-default">Фиолетовая</button>
-    `,
-    `
-      :root {
-        --theme-primary: #594d7f;
+  const themeTemplate = `
+    :root {
         --night-active-checkbox-background-color: var(--theme-primary) !important;
         --night-active-checkbox-border-color: var(--theme-primary) !important;
         --night-active-talk-color: var(--theme-primary) !important;
         --night-link-color: var(--theme-primary) !important;
         --night-button-stop-color: var(--theme-primary) !important;
-        --night-background-color: #101010 !important;
         --night-header-text-color: var(--theme-primary) !important;
         --night-header-border-color: var(--theme-primary) !important;
-        --night-header-background-color: #171717 !important;
       }
       .navbar {
           background: var(--theme-primary) !important;
@@ -750,13 +759,30 @@
           background-color: var(--theme-primary) !important;
       }
       .volume_slider .slider-piecewise {
-          background-color: color-mix(in srgb, var(--night-active-checkbox-border-color), rgb(255,255,255) 20%) !important;
+          background-color: color-mix(in srgb, var(--theme-primary), rgb(255,255,255) 20%) !important;
       }
-
       .mute-button.muted {
         background-color: var(--theme-primary) !important;
       }
+
+  `
+
+
+  themeController.defineTheme(
+    'purple',
+    'Фиолетовая',
+    'night',
     `
+      <button class="btn btn-default">Фиолетовая</button>
+    `,
+    `
+      :root {
+        --theme-primary: #594d7f;
+        --night-background-color: #101010 !important;
+        --night-header-background-color: #171717 !important;
+      }
+    `,
+    themeTemplate
   )
 
 
@@ -875,40 +901,11 @@
     `
       :root {
         --theme-primary: #123311;
-        --night-active-checkbox-background-color: var(--theme-primary) !important;
-        --night-active-checkbox-border-color: var(--theme-primary) !important;
-        --night-active-talk-color: var(--theme-primary) !important;
         --night-background-color: #101010 !important;
-        --night-header-text-color: var(--theme-primary) !important;
-        --night-header-border-color: var(--theme-primary) !important;
         --night-header-background-color: #171717 !important;
       }
-      .navbar {
-          background: var(--theme-primary) !important;
-      }
-
-      div.outer-container {
-        width: 100% !important;
-        margin: 0% !important;
-      }
-
-      .audio-chat .header .chat {
-          color: var(--theme-primary) !important;
-          font-weight: bold;
-          font-size: 15px ! important;
-          display: inline ! important;
-      }
-
-      .volume_slider .slider-dot {
-          background-color: var(--theme-primary) !important;
-      }
-      .volume_slider .slider-process {
-          background-color: var(--theme-primary) !important;
-      }
-      .volume_slider .slider-piecewise {
-          background-color: color-mix(in srgb, var(--night-active-checkbox-border-color), rgb(255,255,255) 20%) !important;
-      }
-    `
+    `,
+    themeTemplate
   )
 
 
@@ -1314,12 +1311,17 @@
 		}
 
     .audio-chat .volume_slider.no-sound::after{
-			background-image: url(${GM_getResourceURL('no_sound')}) !important;
+			mask: url(${GM_getResourceURL('no_sound')}) no-repeat center / contain;
 		}
 
     .audio-chat .volume_slider::after{
-			background-image: url(${GM_getResourceURL('sound')}) !important;
-		}`
+			mask: url(${GM_getResourceURL('sound')}) no-repeat center / contain;
+      background-image: none !important;
+      background-color: var(--night-active-checkbox-background-color);
+      width: 17px !important;
+      height: 29px !important;
+		}
+    `
   )
 
 
