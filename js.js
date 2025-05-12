@@ -2,7 +2,7 @@
 // @name        nektomi [Ultima]
 // @match       https://nekto.me/audiochat*
 // @grant       none
-// @version     1.5.4.0
+// @version     1.5.5.0
 // @author      -
 // @description 6/3/2023, 2:04:02 AM
 // @namespace   ultima
@@ -474,6 +474,11 @@
           font-size: large;
       }
 
+      a.local-time {
+        margin: auto;
+        width: 50%;
+      }
+
     `
 
 
@@ -520,6 +525,12 @@
           const brand = node.querySelector('.navbar-brand')
           // log('brand', brand)
           brand.innerHTML = 'Nekto.me [Ultima]'
+          node.insertAdjacentHTML("beforeend", `
+          <a id="ultima_localtime" class="navbar-brand local-time">11:11</a>
+          `)
+          setInterval(()=>{
+            unsafeWindow.document.querySelector('#ultima_localtime').innerHTML = new Date().toLocaleTimeString([], {hour: '2-digit', minute: "2-digit", hour12: false})
+          }, 500)
           node.insertAdjacentHTML("beforeend", this.html)
           const settingsDropdown = node.querySelector('#settingsDropdown')
           const toggleButton = node.querySelector('.settings-toggle')
@@ -614,7 +625,17 @@
 
     injectWhenReady(){
       VM.observe(unsafeWindow.document, () => {
-        const node = unsafeWindow.document.querySelector('div.chat-step.idle')
+        let node
+        const cont = unsafeWindow.document.querySelector('div:has(> div.chat-step:not(.error-1))')
+        if(cont?.__vue__){
+          node = cont
+        }
+        else{
+          const step = unsafeWindow.document.querySelector('div.chat-step.idle')
+          if(step?.__vue__){
+            node = step
+          }
+        }
         if (node && node.__vue__){
           const vue = node.__vue__
           unsafeWindow.v = vue
@@ -1160,13 +1181,6 @@
 		startObserver(){
 			this.disconnectObserver = VM.observe(unsafeWindow.document, () => {
 				this.ogElem = document.querySelector(this.ogClassname)
-
-				if (this.ogElem) {
-					this.create()
-				}
-				else{
-          this.remove()
-				}
 			});
 		}
   }
