@@ -2,7 +2,7 @@
 // @name        nektomi [Ultima]
 // @match       https://nekto.me/audiochat*
 // @grant       none
-// @version     1.5.5.0
+// @version     1.5.5.1
 // @author      -
 // @description 6/3/2023, 2:04:02 AM
 // @namespace   ultima
@@ -264,19 +264,42 @@
       })
     }
 
+    isMuted(){
+      return this.get() == 0
+    }
+
+    toggleMute(muted){
+      if(muted === undefined){
+        muted = !this.isMuted()
+      }
+      // log('vol mute', muted)
+      if(muted){
+        this._prevVolume = this.get()
+        this.set(0)
+        volumeMuteIcon.setMute(true)
+      }
+      else{
+        if(this._prevVolume){
+          this.set(this._prevVolume)
+        }
+        else{
+          this.set(0.5)
+          console.warn('prevVolume is none')
+        }
+        volumeMuteIcon.setMute(false)
+      }
+    }
+
     keydownListenForBindings(){
       document.addEventListener('keydown', async (event) => {
         const code = event.code
         if(code == keyVolumeMute){
           event.stopImmediatePropagation()
-          this._prevVolume = this.get()
-          this.set(0)
-          volumeMuteIcon.setMute(true)
+          this.toggleMute(true)
         }
         if(code == keyVolumeUnmute){
           event.stopImmediatePropagation()
-          this.set(this._prevVolume)
-          volumeMuteIcon.setMute(false)
+          this.toggleMute(false)
         }
       })
     }
@@ -529,7 +552,7 @@
           <a id="ultima_localtime" class="navbar-brand local-time">11:11</a>
           `)
           setInterval(()=>{
-            unsafeWindow.document.querySelector('#ultima_localtime').innerHTML = new Date().toLocaleTimeString([], {hour: '2-digit', minute: "2-digit", hour12: false})
+            unsafeWindow.document.querySelector('#ultima_localtime').innerHTML = new Date().toLocaleTimeString([], {hour: '2-digit', minute: "2-digit", hourCycle: 'h23'})
           }, 500)
           node.insertAdjacentHTML("beforeend", this.html)
           const settingsDropdown = node.querySelector('#settingsDropdown')
@@ -1155,19 +1178,27 @@
 
 
   class VolumeMuteIcon{
-		constructor(ogClassname, onToggle){
+		constructor(ogClassname){
       this.ogClassname = ogClassname
-      this.onToggle = onToggle
 
 			this.startObserver()
 		}
 
 		create(){
+      if(this.ogElem._ultima){ return }
+      this.ogElem._ultima = true
       log('VolumeMuteIcon created')
+      this._event = this.ogElem.addEventListener('click', (e)=>{
+        if(e.layerX >= 0){ return }
+        volume.toggleMute()
+      })
 		}
 
     remove(){
-      return
+      if(!this.ogElem){return}
+      this.ogElem.removeEventListener('click', this._event)
+
+      this.ogElem = null
     }
     setMute(active){
       if(active){
@@ -1180,18 +1211,21 @@
 
 		startObserver(){
 			this.disconnectObserver = VM.observe(unsafeWindow.document, () => {
-				this.ogElem = document.querySelector(this.ogClassname)
+				const node = document.querySelector(this.ogClassname)
+        if(node){
+          this.ogElem = node
+          this.create()
+        }
+        else{
+          this.remove()
+        }
 			});
 		}
   }
 
 
   let volumeMuteIcon = new VolumeMuteIcon(
-    '.volume_slider',
-    (isMuted)=>{
-      console.log("force mute to", isMuted)
-      micStream.enabled = !isMuted
-    }
+    '.volume_slider'
   )
 
 
