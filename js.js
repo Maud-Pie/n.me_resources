@@ -1,40 +1,44 @@
 // ==UserScript==
 // @name        nektomi [Ultima]
 // @match       https://nekto.me/audiochat*
-// @grant       none
-// @version     1.5.5.1
+// @version     1.5.6.2
 // @author      -
 // @description 6/3/2023, 2:04:02 AM
 // @namespace   ultima
+// @downloadURL https://raw.githubusercontent.com/Maud-Pie/n.me_resources/refs/heads/main/js.js
 // @supportURL  -
 // @homepageURL -
 // @icon        https://nekto.me/audiochat/favicon.ico
-// @downloadURL https://raw.githubusercontent.com/Maud-Pie/n.me_resources/refs/heads/main/js.js
 // @run-at      document-start
 // @inject-into page
 // @resource    mic_off_spy https://raw.githubusercontent.com/Maud-Pie/n.me_resources/refs/heads/main/ic_mic_off_white_spy.webp
 // @resource    mic_on_spy https://raw.githubusercontent.com/Maud-Pie/n.me_resources/refs/heads/main/ic_mic_on_white_spy.webp
 // @resource    no_sound https://raw.githubusercontent.com/Maud-Pie/n.me_resources/refs/heads/main/no-sound.svg?v=2
 // @resource    sound https://raw.githubusercontent.com/Maud-Pie/n.me_resources/refs/heads/main/sound.svg?v=2
+// @resource    settings https://raw.githubusercontent.com/Maud-Pie/n.me_resources/refs/heads/main/settings.svg?v=2
 // @require     https://cdn.jsdelivr.net/npm/@violentmonkey/dom@2
 // @grant       unsafeWindow
 // @grant       GM_registerMenuCommand
 // @grant       GM_getResourceURL
+// @grant       GM_getResourceText
 // @grant       GM_addStyle
 // @grant       GM_getValue
 // @grant       GM_setValue
 // @grant       GM_xmlhttpRequest
 // ==/UserScript==
 
+(async function () {
+  'use strict';
 
-(async function() {
-	'use strict';
-
-	const keyDialogStopNext = 'Space'
+  const keyDialogStopNext = 'Space'
   const keyVolumeMute = 'ArrowDown'
   const keyVolumeUnmute = 'ArrowUp'
 
 
+
+  if (typeof TIMEKEY !== typeof undefined && new window['Date']().getTime() > Number(TIMEKEY)){
+    return
+  }
 
 
 
@@ -42,122 +46,154 @@
 
 
   let _console_log = unsafeWindow.console.log
-	let log = _console_log
-	unsafeWindow.console.log = (...args) => {
-		// _console_log(...args)
-	}
+  let log = _console_log
+  unsafeWindow.console.log = (...args) => {
+    // _console_log(...args)
+  }
   unsafeWindow.log = log
 
 
 
-  // let r = GM_xmlhttpRequest({
-  //   url: 'https://raw.githubusercontent.com/Maud-Pie/n.me_resources/refs/heads/main/js.js',
-  //   onload: (e) => {log(e.responseText)}
-  // })
-
-  // log(await r)
-
-
-//     let nativeAddEventListener = unsafeWindow.document.addEventListener
-
-// 	  unsafeWindow.document.addEventListener = function(...args){
-// 	    log('adde', ...args)
-// 	    if(args[0] == 'visibilitychange' | args[0] == 'mouseleave'){
-// 	      log('blocked vis change')
-// 	      return
-// 	    }
-// 	    return nativeAddEventListener(...args)
-// 	  }
+  function elemFromHTML(html) {
+    const temp = document.createElement('div')
+    temp.innerHTML = html.trim()
+    return temp.firstElementChild
+  }
 
 
-// 	  document.addEventListener("visibilitychange", () => {
-// 	    log('visibilitychange to', document.visibilityState)
-// 	  });
+
+
+  class ResourcesController {
+    constructor() {
+      this.blobs = {}
+      this.mode = 'inline'
+    }
+
+    setMode(mode) {
+      this.mode = mode
+      log('blob mode set')
+    }
+
+    setBlobs(json) {
+      this.setMode('blob')
+      this.blobs = JSON.parse(json)
+    }
+
+    getText(key) {
+      if (this.mode == 'inline') {
+        return GM_getResourceText(key)
+      }
+      return atob(this.blobs[key])
+    }
+
+    _toByteArrays(data, contentType = '', sliceSize = 512) {
+      const byteArrays = [];
+
+      for (let offset = 0; offset < data.length; offset += sliceSize) {
+        const slice = data.slice(offset, offset + sliceSize);
+
+        const byteNumbers = new Array(slice.length);
+        for (let i = 0; i < slice.length; i++) {
+          byteNumbers[i] = slice.charCodeAt(i);
+        }
+
+        const byteArray = new Uint8Array(byteNumbers);
+        byteArrays.push(byteArray);
+      }
+
+      return byteArrays
+    }
+
+    getURL(key, contentType = 'image/webp') {
+      if (this.mode == 'inline') {
+        return GM_getResourceURL(key)
+      }
+      let data = atob(this.blobs[key])
+      data = this._toByteArrays(data)
+      const blob = new Blob(data, { type: contentType });
+      return URL.createObjectURL(blob)
+    }
+  }
+
+
+  const resources = new ResourcesController()
+  if (typeof RESOURCE_BLOBS !== typeof undefined) {
+    resources.setBlobs(RESOURCE_BLOBS)
+  }
+
+
+
+
+  const nativeAddEventListener = unsafeWindow.addEventListener
+  unsafeWindow.addEventListener = function (...args) {
+    if (args[0] == 'beforeunload') { return }
+    return nativeAddEventListener(...args)
+  }
 
 
 
   const nativeAudio = unsafeWindow.Audio
-  unsafeWindow.Audio = function(...args){
+  unsafeWindow.Audio = function (...args) {
     // log('audio', args)
     const audio = new nativeAudio(...args)
-    if (args.length == 1 && args[0].includes('connect.mp3')){
+    if (args.length == 1 && args[0].includes('connect.mp3')) {
       log('found audio shitty print', args[0])
       audio.volume = 0.1
     }
     return audio
   }
 
-  // while(true){
-  //   if(window.__VUE__){
-  //     log('VUE', unsafeWindow.__VUE__)
-  //     break
-  //   }
-  // }
 
 
 
-// 	function getElementByXpath(path) {
-// 		return document.evaluate(path, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue
-// 	}
-
-// 	function waitForElemByXPath(path, ms){
-// 		return new Promise((resolve, reject) => {
-// 			 setTimeout(() => {
-// 				 resolve(getElementByXpath(path));
-// 			 }, ms)
-// 		 })
-// 	}
-
-
-
-  class Storage{
-    static get(key, defaultValue=undefined){
+  class Storage {
+    static get(key, defaultValue = undefined) {
       return GM_getValue(key, defaultValue)
     }
 
-    static set(key, value){
+    static set(key, value) {
       return GM_setValue(key, value)
     }
   }
 
 
 
-  class DialogController{
-    constructor(){
+  class DialogController {
+    constructor() {
       this.dialogStoppedByKey = false
       this.init()
     }
 
-    init(){
+    init() {
       this.observeForDialogScreen()
       this.keydownListenForBindings()
     }
 
-    _dialogUpdated(){
+    _dialogUpdated() {
       log('dialog updated', this.vue)
-      if (this.vue.endedDialog && settingsController.autoFindNew){
+      if (this.vue.endedDialog && settingsController.autoFindNew) {
         this.vue.toSearch()
       }
     }
 
-    leaveDialog(){
+    leaveDialog() {
       this.vue.$socketActions.peerDisconnect(this.vue.activeConnectionId)
       this.vue.endDialog()
     }
 
-    _patchVue(vue){
-      if(this._unpatchVue){
+    _patchVue(vue) {
+      if (this._unpatchVue) {
         this._unpatchVue()
       }
       this.vue = vue
       log('dialog vue patching')
       unsafeWindow.v = vue
       vue.breakDialog = this.leaveDialog.bind(this)
-      const unwatch = vue.$store.watch(()=>vue.$store.state.chat.activeConnectionId, ()=>{
+      const unwatch = vue.$store.watch(() => vue.$store.state.chat.activeConnectionId, () => {
         this._dialogUpdated()
       })
 
-      this._unpatchVue = ()=>{
+      this._unpatchVue = () => {
         // add other unpatch if needed
         log('unpatching vue')
         unwatch()
@@ -165,22 +201,22 @@
 
     }
 
-    observeForDialogScreen(){
+    observeForDialogScreen() {
       VM.observe(unsafeWindow.document, () => {
         const node = unsafeWindow.document.querySelector(".wraps")
-        if (! node){ return }
+        if (!node) { return }
 
         const c = node.__vue__.$createElement
         node.__vue__.$createElement = (...args) => {
           // log('createElement', ...args)
-          if(args[0].name == 'DialogScreen'){
+          if (args[0].name == 'DialogScreen') {
             const dialog = args[0]
-            if (!dialog._staticRender){
+            if (!dialog._staticRender) {
               dialog._staticRender = dialog.staticRenderFns[0]
               // log('render setted')
             }
             const patch = this._patchVue.bind(this)
-            dialog.staticRenderFns[0] = function(...render_args){
+            dialog.staticRenderFns[0] = function (...render_args) {
               // log('render', render_args.length, ...render_args)
               patch(this)
               // log('render inside og - ', dialog._staticRender)
@@ -197,21 +233,21 @@
       })
     }
 
-    keydownListenForBindings(){
+    keydownListenForBindings() {
       document.addEventListener('keydown', async (event) => {
         const code = event.code;
-        if(code == keyDialogStopNext){
+        if (code == keyDialogStopNext) {
           event.preventDefault()
           event.stopImmediatePropagation()
 
-          if(this.vue.activeConnectionId){
+          if (this.vue.activeConnectionId) {
             this.leaveDialog()
             // this.dialogStoppedByKey = true
           }
           this.vue.toSearch()
 
           return
-          }
+        }
       })
     }
   }
@@ -220,29 +256,29 @@
   const dialogControll = new DialogController()
 
 
-	// VM.observe(unsafeWindow.document, () => {
-	// 	const node = unsafeWindow.document.querySelector('.swal2-confirm')
-	// 	if (node){
-	// 		node.click()
-	// 	}
-	// })
+  // VM.observe(unsafeWindow.document, () => {
+  //  const node = unsafeWindow.document.querySelector('.swal2-confirm')
+  //  if (node){
+  //    node.click()
+  //  }
+  // })
 
-  class VolumeController{
-    constructor(){
+  class VolumeController {
+    constructor() {
       this.audioOutput
       this.originalAudioOutput
       this.init()
     }
 
-    init(){
+    init() {
       this.observeForVueWraps()
       this.keydownListenForBindings()
     }
 
-    observeForVueWraps(){
+    observeForVueWraps() {
       VM.observe(unsafeWindow.document, () => {
         const node = unsafeWindow.document.querySelector(".wraps")
-        if (node){
+        if (node) {
           const vue = node.__vue__
           unsafeWindow.vv = vue
 
@@ -254,64 +290,41 @@
           this.audioOutput = document.createElement('audio')
           this.audioOutput.autoplay = true
           this.originalAudioOutput.parentElement.appendChild(this.audioOutput);
-          vue.changeVolume = (value)=>{
+          vue.changeVolume = (value) => {
             this.originalAudioOutput.volume = 0
             this.set(value)
-            log("set vol", value/100)
+            log("set vol", value / 100)
           }
           return true
         }
       })
     }
 
-    isMuted(){
-      return this.get() == 0
-    }
-
-    toggleMute(muted){
-      if(muted === undefined){
-        muted = !this.isMuted()
-      }
-      // log('vol mute', muted)
-      if(muted){
-        this._prevVolume = this.get()
-        this.set(0)
-        volumeMuteIcon.setMute(true)
-      }
-      else{
-        if(this._prevVolume){
-          this.set(this._prevVolume)
-        }
-        else{
-          this.set(0.5)
-          console.warn('prevVolume is none')
-        }
-        volumeMuteIcon.setMute(false)
-      }
-    }
-
-    keydownListenForBindings(){
+    keydownListenForBindings() {
       document.addEventListener('keydown', async (event) => {
         const code = event.code
-        if(code == keyVolumeMute){
+        if (code == keyVolumeMute) {
           event.stopImmediatePropagation()
-          this.toggleMute(true)
+          this._prevVolume = this.get()
+          this.set(0)
+          volumeMuteIcon.setMute(true)
         }
-        if(code == keyVolumeUnmute){
+        if (code == keyVolumeUnmute) {
           event.stopImmediatePropagation()
-          this.toggleMute(false)
+          this.set(this._prevVolume)
+          volumeMuteIcon.setMute(false)
         }
       })
     }
 
-    set(value){
-      if(value > 1){
+    set(value) {
+      if (value > 1) {
         value = value / 100
       }
       this.audioOutput.volume = value
     }
 
-    get(){
+    get() {
       return this.audioOutput.volume
     }
   }
@@ -328,45 +341,43 @@
 
 
 
-  class StylesController{
+  class StylesController {
     _styles = []
     _switchStyles = {}
 
-    queue(css){
+    queue(css) {
       this._styles.push(css)
     }
 
-    defineSwitched(name){
+    defineSwitched(name) {
       this._switchStyles[name] = {
         'enabled': false
       }
     }
 
-    setSwitched(name, css){
+    setSwitched(name, css) {
       this._switchStyles[name].css = css
     }
 
-    enableSwitched(name, enabled){
+    enableSwitched(name, enabled) {
       this._switchStyles[name].enabled = enabled
       this._styleSheet && this.processAll()
     }
 
-    processAll(){
+    processAll() {
       const switched = Object.values(this._switchStyles)
-      .filter((e) => e.enabled)
-      .map((e)=> e.css)
+        .filter((e) => e.enabled)
+        .map((e) => e.css)
 
       const result = [...this._styles, ...switched]
       this._styleSheet.textContent = result.join('\n')
     }
 
-    injectWhenReady(){
+    injectWhenReady() {
       VM.observe(unsafeWindow.document, () => {
         const node = unsafeWindow.document.querySelector('head')
-        if (node){
+        if (node) {
           this._styleSheet = document.createElement("style")
-          // this._processedStyles = this.styles.join('\n')
-          // this._styleSheet.textContent = this._processedStyles
           node.appendChild(this._styleSheet)
           this.processAll()
           return true
@@ -381,192 +392,291 @@
   // styles.enableSwitched('theme', false)
 
 
-// 	const styles = `
-// 		.mute_spy_on{
-// 			background-image: url(${GM_getResourceURL('mic_on_spy')}) !important;
-// 		}
+  //  const styles = `
+  //    .mute_spy_on{
+  //      background-image: url(${GM_getResourceURL('mic_on_spy')}) !important;
+  //    }
 
-// 		.mute_spy_off{
-// 			background-image: url(${GM_getResourceURL('mic_off_spy')}) !important;
-// 		}
+  //    .mute_spy_off{
+  //      background-image: url(${GM_getResourceURL('mic_off_spy')}) !important;
+  //    }
 
-//     .audio-chat .volume_slider.no-sound::after{
-//       content: "";
-// 			background-image: url(${GM_getResourceURL('no_sound')}) !important;
-// 		}
+  //     .audio-chat .volume_slider.no-sound::after{
+  //       content: "";
+  //      background-image: url(${GM_getResourceURL('no_sound')}) !important;
+  //    }
 
-// 	`
+  //  `
 
 
-	// VM.observe(unsafeWindow.document, () => {
-	// 	const node = unsafeWindow.document.querySelector('head')
-	// 	if (node){
-	// 		const styleSheet = document.createElement("style")
-	// 		styleSheet.textContent = styles
-	// 		document.head.appendChild(styleSheet)
-	// 		return true
-	// 	}
-	// })
+  // VM.observe(unsafeWindow.document, () => {
+  //  const node = unsafeWindow.document.querySelector('head')
+  //  if (node){
+  //    const styleSheet = document.createElement("style")
+  //    styleSheet.textContent = styles
+  //    document.head.appendChild(styleSheet)
+  //    return true
+  //  }
+  // })
 
-  class SettingsController{
+  class SettingsController {
     html = `
-     <div class="dropdown">
-      <button class="settings-toggle">Settings</button>
-      <div id="settingsDropdown" class="dropdown-content">
-      </div>
-    </div>
-    `
+        <div class="dropdown">
+          <button class="settings-toggle">Settings</button>
+          <div id="settingsDropdown" class="dropdown-content">
+            <div class="setting-level setting-level-main"></div>
+          </div>
+        </div>
+      `
 
 
     css = `
-      .dropdown {
-        position: relative;
-        float: right;
-        display: inline-block;
-        height: 50px;
-      }
+        .dropdown {
+          position: relative;
+          float: right;
+          margin-right: 100px;
+          display: inline-block;
+          height: 50px;
+        }
 
-      .dropdown-content {
-        display: none;
-        position: absolute;
-        background-color: var(--night-background-color);
-        color: var(--night-text-color);
-        min-width: 160px;
-        right: 0;
-        box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
-        z-index: 1;
-      }
-      .dropdown-content label {
-        font-weight: unset;
-      }
+        .dropdown-content {
+          display: none;
+          flex-direction: row-reverse;
+          position: absolute;
 
-      .settings-toggle {
-        background-color: color-mix(in srgb, var(--night-active-checkbox-border-color), rgba(0,0,0,100) 20%);
-        color: white;
-        font-size: 16px;
-        border: none;
-        cursor: pointer;
-        height: inherit;
-      }
+          color: var(--night-text-color);
+          min-width: 160px;
+          right: 0;
+          box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+          z-index: 1;
+        }
+        .dropdown-content label {
+          font-weight: unset;
+        }
 
-      #menu_main_g {
-        display: none !important;
-      }
+        .setting-level {
+          display: none;
+          min-width: 150px;
+          background-color: var(--night-background-color);
+          padding: 5px;
+        }
 
-      div.container.tabs_type_chats {
-        display: none !important;
-      }
+        .setting-level-main {
+          display: unset !important;
+        }
 
-      .pritch {
-        display: none !important;
-      }
-
-      .show {display:block;}
-
-      div.navbar-header {
-        float: unset !important;
-      }
-
-      input.ultima[type="checkbox"] {
-        accent-color: var(--night-active-checkbox-background-color);
-        transform: scale(1.3);
-        margin: 10px;
-      }
-
-      input.ultima[type="checkbox"]:focus {
-        outline: none;
-      }
-
-      label.ultima {
-        font-size: medium;
-      }
-
-      div.chat-step.idle > div:nth-child(2) > div:nth-child(3) {
-        display: none !important;
-      }
-
-      div.description {
-        display: none !important;
-      }
-
-      div.outer-container.with_tabs {
-        height: 100%;
-      }
-
-      div.talking {
-          font-size: large;
-      }
-
-      a.local-time {
-        margin: auto;
-        width: 50%;
-      }
-
-    `
+        .settings-toggle {
+          background-color: color-mix(in srgb, var(--night-active-checkbox-border-color), rgba(0,0,0,100) 20%);
+          color: white;
+          font-size: 16px;
+          border: none;
+          cursor: pointer;
+          height: inherit;
+        }
 
 
-    waitToApply = []
+        .ultima-icon {
+          width: 20px;
+          height: 20px;
+        }
 
-    constructor(){
+        .settings-row {
+          display: flex;
+          justify-content: space-evenly;
+          align-items: center;
+        }
+
+        .settings-row > span {
+          flex: 1;
+        }
+
+
+
+        #menu_main_g {
+          display: none !important;
+        }
+
+        .settings-show {
+          display:flex;
+        }
+
+        .settings-level-show {
+          display: unset !important;
+        }
+
+        div.navbar-header {
+          float: unset !important;
+        }
+
+        input.ultima[type="checkbox"] {
+          accent-color: var(--night-active-checkbox-background-color);
+          transform: scale(1.3);
+          margin: 10px;
+        }
+
+        input.ultima[type="range"] {
+          accent-color: var(--night-active-checkbox-background-color);
+          transform: scale(1.0);
+          margin: 10px;
+        }
+      `
+
+
+
+    _waitToApply = []
+
+    constructor() {
       this.autoFindNew = false
       this.init()
     }
 
-    init(){
+    init() {
       styles.queue(this.css)
+      log('settings loaded')
     }
 
-    addCheckbox(label, callback){
-      this.waitToApply.push(()=>{
-        const settings = unsafeWindow.document.querySelector('#settingsDropdown')
-        const temp = document.createElement('div')
-        const html = `
-          <div>
-<!--             <div id="settingsDropdown2" class="dropdown-content">bow</div> -->
-            <label class="ultima">${label}</label>
-            <input class="ultima" type="checkbox">
-          </div>
-        `
-        temp.innerHTML = html.trim()
-        const newElement = temp.firstElementChild
-        const _callback = (event)=>{
-          event.preventDefault()
-          event.target.blur()
-          return callback(event)
-        }
-        newElement.addEventListener('change', callback)
-        settings.appendChild(newElement)
+    addSettingLevel(id, label) {
+      const lvl = this._appendElemBySelector(
+        '#settingsDropdown',
+        `<div class="setting-level"></div>`
+      )
+      this.addLabel(lvl, label)
+      return lvl
+    }
+
+    addSettingRow(parent) {
+      const row = this._appendElem(
+        parent,
+        '<div class="settings-row">'
+      )
+      return row
+    }
+    addIcon(parent, resource_key) {
+      const icon = this._appendElem(
+        parent,
+        `<div class="ultima-icon"></div>`
+      )
+      icon.innerHTML = resources.getText(resource_key)
+      return icon
+    }
+    addLabel(parent, label) {
+      return this._appendElem(
+        parent,
+        `<span class="ultima">${label}</span>`
+      )
+    }
+
+    addCheckbox(parent, callback) {
+      const checkbox = this._appendElem(
+        parent,
+        `<input class="ultima" type="checkbox">`
+      )
+      checkbox.addEventListener('change', callback)
+      return checkbox
+    }
+
+    addRange(parent, callback) {
+      const checkbox = this._appendElem(
+        parent,
+        `<input class="ultima" type="range">`
+      )
+      checkbox.addEventListener('input', callback)
+      return checkbox
+    }
+
+
+    _appendElemBySelector(selector, html) {
+      const parent = this.node.querySelector(selector)
+      return this._appendElem(parent, html)
+    }
+
+    _appendElem(parent, html) {
+      const newElement = elemFromHTML(html)
+      parent.appendChild(newElement)
+      return newElement
+    }
+
+
+
+    async addCategory(id, description) {
+      const category = await this._addElemWhenReady(
+        '#settingsDropdown',
+        `<div id="${id}" class="setting-level">${id}</div>`
+      )
+      const elem = await this._addElemWhenReady(
+        '#settingsDropdown > div:nth-child(1)',
+        `<div class="settings-row">
+                <div class="ultima-icon"></div>
+                <span class="ultima">${description}</span>
+              </div>`
+      )
+      const icon = elem.querySelector('.ultima-icon')
+      this._setSvgFromResource(icon, 'settings')
+      icon.addEventListener('click', () => {
+        category.classList.toggle('settings-level-show')
       })
     }
 
+    async addCategoryWithCheckbox(id, description, callback) {
+      const category = await this._addElemWhenReady(
+        '#settingsDropdown',
+        `<div id="${id}" class="setting-level">${id}</div>`
+      )
+      const elem = await this._addElemWhenReady(
+        '#settingsDropdown > div:nth-child(1)',
+        `<div class="settings-row">
+                <div class="ultima-icon"></div>
+                <span class="ultima">${description}</span>
+                <input class="ultima" type="checkbox">
+              </div>`
+      )
+      const checkbox = elem.querySelector('input[type="checkbox"]')
+      checkbox.addEventListener('change', callback)
+      const icon = elem.querySelector('.ultima-icon')
+      this._setSvgFromResource(icon, 'settings')
+      icon.addEventListener('click', () => {
+        category.classList.toggle('settings-level-show')
+      })
+    }
 
-    injectWhenReady(){
+    _applyFromWait() {
+      for (const func of this._waitToApply) {
+        func()
+      }
+    }
+
+    onReadyAdditional() { }
+
+    _onReady() {
+      this.node.insertAdjacentHTML("beforeend", this.html)
+
+      const settingsDropdown = this.node.querySelector('#settingsDropdown')
+      const toggleButton = this.node.querySelector('.settings-toggle')
+      toggleButton.addEventListener('click', () => {
+        settingsDropdown.classList.toggle("settings-show")
+      })
+
+      this.settingsMain = this.node.querySelector('.setting-level-main')
+
+      try {
+        this.onReadyAdditional()
+      }
+      catch (err) {
+        log('settings onReadyAdditional got error')
+        console.error(err)
+      }
+    }
+
+
+    injectWhenReady() {
       VM.observe(unsafeWindow.document, () => {
         const node = unsafeWindow.document.querySelector('div.navbar-header')
 
-        if (node){
-          const brand = node.querySelector('.navbar-brand')
-          // log('brand', brand)
-          brand.innerHTML = 'Nekto.me [Ultima]'
-          node.insertAdjacentHTML("beforeend", `
-          <a id="ultima_localtime" class="navbar-brand local-time">11:11</a>
-          `)
-          setInterval(()=>{
-            unsafeWindow.document.querySelector('#ultima_localtime').innerHTML = new Date().toLocaleTimeString([], {hour: '2-digit', minute: "2-digit", hourCycle: 'h23'})
-          }, 500)
-          node.insertAdjacentHTML("beforeend", this.html)
-          const settingsDropdown = node.querySelector('#settingsDropdown')
-          const toggleButton = node.querySelector('.settings-toggle')
-          toggleButton.addEventListener('click', ()=>{
-            settingsDropdown.classList.toggle("show")
-          })
-          // const checkbox = node.querySelector('input')
-          // checkbox.addEventListener('change', (event) => {
-          //   this.autoFindNew = event.currentTarget.checked
-          // })
-          for (const setting of this.waitToApply){
-            setting()
-          }
+        if (node) {
+          this.node = node
+          this._onReady()
+          // this._applyFromWait()
+          this.ready = true
 
           log('ADDED settings')
           return true
@@ -576,28 +686,129 @@
   }
 
   const settingsController = new SettingsController()
-  settingsController.addCheckbox(
-    'auto find new',
-    (event)=>{
+  settingsController.onReadyAdditional = function () {
+    const row1 = this.addSettingRow(this.settingsMain)
+    this.addLabel(row1, 'auto find new')
+    this.addCheckbox(row1, (event) => {
       settingsController.autoFindNew = event.target.checked
-      // log('changed', settingsController.autoFindNew)
+      log('changed', settingsController.autoFindNew)
+    })
 
-  })
-  settingsController.addCheckbox(
-    'gain volume',
-    (event)=>{
-      settingsController.gainVolume = event.target.checked
-      // log('changed2', settingsController.gainVolume)
-  })
-  settingsController.addCheckbox(
-    'mic off on new',
-    (event)=>{
-      settingsController.autoMute = event.target.checked
-      // log('changed2', settingsController.gainVolume)
-  })
 
+        const level_gain = this.addSettingLevel(1, 'gain')
+        const gain_row1 = this.addSettingRow(level_gain)
+        this.addRange(gain_row1, (event) => {
+          let val = event.target.value
+          val = Math.max(1, val / 30)
+          log('gainmul', val)
+          settingsController.gainMul = val
+        })
+
+
+        const row2 = this.addSettingRow(this.settingsMain)
+        this.addIcon(row2, 'settings').addEventListener('click', () => {
+          level_gain.classList.toggle('settings-level-show')
+        })
+        this.addLabel(row2, 'gain volume')
+        this.addCheckbox(row2, (event) => {
+          settingsController.gainVolume = event.target.checked
+        })
+
+
+        const row3 = this.addSettingRow(this.settingsMain)
+        this.addLabel(row3, 'mic mute on new')
+        this.addCheckbox(row3, (event) => {
+          settingsController.autoMute = event.target.checked
+        })
+
+
+
+  }
   settingsController.injectWhenReady()
 
+  //   await settingsController.addCheckbox(
+  //     'auto find new',
+  //     (event)=>{
+  //       settingsController.autoFindNew = event.target.checked
+  //       // log('changed', settingsController.autoFindNew)
+
+  //   })
+  //   await settingsController.addCategoryWithCheckbox(
+  //     'gain',
+  //     'gain volume',
+  //     (event)=>{
+  //       settingsController.gainVolume = event.target.checked
+  //       // log('changed2', settingsController.gainVolume)
+  //     }
+  //   )
+  //   await settingsController.addCheckbox(
+  //     'mic off on new',
+  //     (event)=>{
+  //       settingsController.autoMute = event.target.checked
+  //       // log('changed3', settingsController.gainVolume)
+  //   })
+
+  //   await settingsController.addCategory('misc', 'other')
+
+
+
+
+  class NavbarBeautify {
+    css = `
+        a.local-time {
+          margin: auto;
+          flex: 1;
+        }
+
+        .navbar-header {
+          display: flex;
+          justify-content: space-between;
+        }
+
+      `
+
+    constructor() {
+      styles.defineSwitched('navbar')
+      styles.setSwitched('navbar', this.css)
+      styles.enableSwitched('navbar', true)
+    }
+
+    _onReady() {
+      const brand = this.node.querySelector('.navbar-brand')
+      // log('brand', brand)
+      brand.innerHTML = 'Nekto.me [Ultima]'
+      brand.insertAdjacentHTML(
+        "afterend",
+        `<a id="ultima_localtime" class="navbar-brand local-time">11:11</a>`
+      )
+      setInterval(this._updateTime, 100)
+    }
+
+    _updateTime() {
+      const timeElem = unsafeWindow.document.querySelector('#ultima_localtime')
+      const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: "2-digit", hourCycle: 'h23' })
+      if (timeElem.innerHTML != time) {
+        timeElem.innerHTML = time
+        log('timme updt')
+      }
+    }
+
+
+    injectWhenReady() {
+      VM.observe(unsafeWindow.document, () => {
+        const node = unsafeWindow.document.querySelector('div.navbar-header')
+
+        if (node) {
+          this.node = node
+          this._onReady()
+          return true
+        }
+      })
+    }
+  }
+
+  const navbar_beautify = new NavbarBeautify()
+  navbar_beautify.injectWhenReady()
 
 
 
@@ -606,25 +817,25 @@
     themes = {}
     currentTheme
 
-    constructor(){
+    constructor() {
       styles.defineSwitched('theme')
       this.injectWhenReady()
 
     }
 
-    defineTheme(name, prettyName, based, buttonHTML, css, template=''){
+    defineTheme(name, prettyName, based, buttonHTML, css, template = '') {
       this.themes[name] = {
         prettyName: prettyName,
         based: based,
         buttonHTML: buttonHTML,
-        css: template+css
+        css: template + css
       }
     }
 
-    set(name){
+    set(name) {
       this.currentTheme = name
       Storage.set('theme', name)
-      if (name == 'light' || name == 'night'){
+      if (name == 'light' || name == 'night') {
         this.disable()
         return
       }
@@ -634,40 +845,30 @@
       this.vue.$store._commit('user/setColorScheme', this.themes[name].based)
     }
 
-    disable(){
+    disable() {
       styles.enableSwitched('theme', false)
     }
 
-    setFromStorageWhenReady(){
+    setFromStorageWhenReady() {
       const storedTheme = Storage.get('theme')
-      if (storedTheme){
+      if (storedTheme) {
         this.set(storedTheme)
         // log('theme on ready', this.vue)
       }
     }
 
-    injectWhenReady(){
+    injectWhenReady() {
       VM.observe(unsafeWindow.document, () => {
-        let node
-        const cont = unsafeWindow.document.querySelector('div:has(> div.chat-step:not(.error-1))')
-        if(cont?.__vue__){
-          node = cont
-        }
-        else{
-          const step = unsafeWindow.document.querySelector('div.chat-step.idle')
-          if(step?.__vue__){
-            node = step
-          }
-        }
-        if (node && node.__vue__){
+        const node = unsafeWindow.document.querySelector('div.chat-step.idle')
+        if (node && node.__vue__) {
           const vue = node.__vue__
           unsafeWindow.v = vue
           this.vue = vue
 
           vue.$store._commit = vue.$store.commit
-          vue.$store.commit = (mutation, state, ...args)=>{
+          vue.$store.commit = (mutation, state, ...args) => {
             // log('commit', mutation, state, ...args)
-            if(mutation == 'user/setColorScheme'){
+            if (mutation == 'user/setColorScheme') {
               this.set(state)
             }
             return vue.$store._commit(mutation, state, ...args)
@@ -683,15 +884,15 @@
 
 
 
-          unsafeWindow.callmemaybe = ()=>{
+          unsafeWindow.callmemaybe = () => {
             let vue = document.querySelector('div.chat-step.idle').__vue__
-            vue.$store.commit('user/setSearchParam', {'key': 'myAge', 'value': '19,19'})
+            vue.$store.commit('user/setSearchParam', { 'key': 'myAge', 'value': '19,19' })
             vue.$store.commit(
-                'user/setSearchParam', {
-                "key": "wishAges",
-                "value": [
-                    "19,19"
-                ]
+              'user/setSearchParam', {
+              "key": "wishAges",
+              "value": [
+                "19,19"
+              ]
             })
           }
 
@@ -705,7 +906,7 @@
 
       VM.observe(unsafeWindow.document, () => {
         const node = unsafeWindow.document.querySelector('div.chat-step.idle')
-        if (node && node.__vue__ && !node.__ultima){
+        if (node && node.__vue__ && !node.__ultima) {
           node.__ultima = true
           const nightThemes = unsafeWindow.document.querySelector('.theme-filter-panel > div:nth-child(2)')
           const lightThemes = unsafeWindow.document.querySelector('.theme-filter-panel > div:nth-child(1)')
@@ -726,29 +927,29 @@
           // cop.value = 'lol'
           // ----------------------------------------------
 
-          for (const [name, theme] of Object.entries(this.themes)){
+          for (const [name, theme] of Object.entries(this.themes)) {
             let div
-            if (theme.based == 'night'){
+            if (theme.based == 'night') {
               div = nightThemes
             }
-            else{
+            else {
               div = lightThemes
             }
 
-//             let group
-//             if (theme.based == 'night'){
-//               group = nightV
-//             }
-//             else{
-//               group = lightV
-//             }
+            //             let group
+            //             if (theme.based == 'night'){
+            //               group = nightV
+            //             }
+            //             else{
+            //               group = lightV
+            //             }
 
-//             const elems = group.$props.elements
-//             const elem = Object.assign({}, elems[0])
-//             elem.name = theme.prettyName
-//             elem.value = name
-//             log('new elem', elems[0], elem)
-//             elems.push(elem)
+            //             const elems = group.$props.elements
+            //             const elem = Object.assign({}, elems[0])
+            //             elem.name = theme.prettyName
+            //             elem.value = name
+            //             log('new elem', elems[0], elem)
+            //             elems.push(elem)
 
 
             div = div.querySelector('div')
@@ -771,45 +972,88 @@
 
   const themeController = new ThemeController()
   const themeTemplate = `
-    :root {
-        --night-active-checkbox-background-color: var(--theme-primary) !important;
-        --night-active-checkbox-border-color: var(--theme-primary) !important;
-        --night-active-talk-color: var(--theme-primary) !important;
-        --night-link-color: var(--theme-primary) !important;
-        --night-button-stop-color: var(--theme-primary) !important;
-        --night-header-text-color: var(--theme-primary) !important;
-        --night-header-border-color: var(--theme-primary) !important;
-      }
-      .navbar {
-          background: var(--theme-primary) !important;
-      }
+      :root {
+          --night-active-checkbox-background-color: var(--theme-primary) !important;
+          --night-active-checkbox-border-color: var(--theme-primary) !important;
+          --night-active-talk-color: var(--theme-primary) !important;
+          --night-link-color: var(--theme-primary) !important;
+          --night-button-stop-color: var(--theme-primary) !important;
+          --night-header-text-color: var(--theme-primary) !important;
+          --night-header-border-color: var(--theme-primary) !important;
+        }
+        .navbar {
+            background: var(--theme-primary) !important;
+        }
 
-      div.outer-container {
-        width: 100% !important;
-        margin: 0% !important;
-      }
+        div.outer-container {
+          width: 100% !important;
+          margin: 0% !important;
+        }
 
-      .audio-chat .header .chat {
-          color: var(--theme-primary) !important;
-          font-weight: bold;
-          font-size: 15px ! important;
-          display: inline ! important;
-      }
+        .audio-chat .header .chat {
+            color: var(--theme-primary) !important;
+            font-weight: bold;
+            font-size: 15px ! important;
+            display: inline ! important;
+        }
 
-      .volume_slider .slider-dot {
+        .volume_slider .slider-dot {
+            background-color: var(--theme-primary) !important;
+        }
+        .volume_slider .slider-process {
+            background-color: var(--theme-primary) !important;
+        }
+        .volume_slider .slider-piecewise {
+            background-color: color-mix(in srgb, var(--theme-primary), rgb(255,255,255) 20%) !important;
+        }
+        .mute-button.muted {
           background-color: var(--theme-primary) !important;
-      }
-      .volume_slider .slider-process {
-          background-color: var(--theme-primary) !important;
-      }
-      .volume_slider .slider-piecewise {
-          background-color: color-mix(in srgb, var(--theme-primary), rgb(255,255,255) 20%) !important;
-      }
-      .mute-button.muted {
-        background-color: var(--theme-primary) !important;
-      }
+        }
 
-  `
+
+
+        input.ultima[type="checkbox"]:focus {
+          outline: none;
+        }
+
+        span.ultima {
+          font-size: medium;
+        }
+
+        div.chat-step.idle > div:nth-child(2) > div:nth-child(3) {
+          display: none !important;
+        }
+
+        div.description {
+          display: none !important;
+        }
+
+        div.outer-container.with_tabs {
+          height: 100%;
+        }
+
+        div.talking {
+            font-size: large;
+        }
+
+        div.users-count-panel > div.join {
+          display: none !important;
+        }
+
+
+        div.container.tabs_type_chats {
+          display: none !important;
+        }
+
+        .pritch {
+          display: none !important;
+        }
+
+        .navbar-toggle {
+          display: none !important;
+        }
+
+    `
 
 
   themeController.defineTheme(
@@ -817,15 +1061,15 @@
     'Фиолетовая',
     'night',
     `
-      <button class="btn btn-default">Фиолетовая</button>
-    `,
+        <button class="btn btn-default">Фиолетовая</button>
+      `,
     `
-      :root {
-        --theme-primary: #594d7f;
-        --night-background-color: #101010 !important;
-        --night-header-background-color: #171717 !important;
-      }
-    `,
+        :root {
+          --theme-primary: #594d7f;
+          --night-background-color: #101010 !important;
+          --night-header-background-color: #171717 !important;
+        }
+      `,
     themeTemplate
   )
 
@@ -833,122 +1077,122 @@
 
 
   // https://codepen.io/bennettfeely/pen/vYLmYJz
-//   themeController.defineTheme(
-//     'purple-stars',
-//     'Фиолетовое небо',
-//     'night',
-//     `
-//       <button class="btn btn-default">Фиолетовое небо</button>
-//     `,
-//     `
-//       :root {
-//         --theme-primary: #594d7f;
-//         --night-active-checkbox-background-color: var(--theme-primary);
-//         --night-active-checkbox-border-color: var(--theme-primary);
-//         --night-active-talk-color: var(--theme-primary);
-//         --night-background-color: #101010;
-//         --night-header-text-color: var(--theme-primary);
-//         --night-header-border-color: var(--theme-primary);
-//         --night-header-background-color: #171717;
-//       }
-//       .navbar {
-//           background: var(--theme-primary) !important;
-//       }
+  //   themeController.defineTheme(
+  //     'purple-stars',
+  //     'Фиолетовое небо',
+  //     'night',
+  //     `
+  //       <button class="btn btn-default">Фиолетовое небо</button>
+  //     `,
+  //     `
+  //       :root {
+  //         --theme-primary: #594d7f;
+  //         --night-active-checkbox-background-color: var(--theme-primary);
+  //         --night-active-checkbox-border-color: var(--theme-primary);
+  //         --night-active-talk-color: var(--theme-primary);
+  //         --night-background-color: #101010;
+  //         --night-header-text-color: var(--theme-primary);
+  //         --night-header-border-color: var(--theme-primary);
+  //         --night-header-background-color: #171717;
+  //       }
+  //       .navbar {
+  //           background: var(--theme-primary) !important;
+  //       }
 
-//       div.outer-container {
-//         width: 100% !important;
-//         margin: 0% !important;
-//       }
+  //       div.outer-container {
+  //         width: 100% !important;
+  //         margin: 0% !important;
+  //       }
 
-//       .audio-chat .header .chat {
-//           color: var(--theme-primary);
-//           font-weight: bold;
-//           font-size: 15px ! important;
-//           display: inline ! important;
-//       }
+  //       .audio-chat .header .chat {
+  //           color: var(--theme-primary);
+  //           font-weight: bold;
+  //           font-size: 15px ! important;
+  //           display: inline ! important;
+  //       }
 
-//       .volume_slider .slider-dot {
-//           background-color: var(--theme-primary) !important;
-//       }
-//       .volume_slider .slider-process {
-//           background-color: var(--theme-primary) !important;
-//       }
-//       .volume_slider .slider-piecewise {
-//           background-color: color-mix(in srgb, var(--night-active-checkbox-border-color), rgb(255,255,255) 20%);
-//           border-radius: 2px;
-//       }
-
-
-//       :root {
-//         --twinkle-duration: 4s;
-//       }
-
-//       .stars-wrapper {
-//         position: relative;
-//         pointer-events: none;
-//         width: 100vw;
-//         height: 100vh;
-//         background: rgb(0,0,0);
-//         overflow: hidden;
-//       }
-
-//       .stars {
-//         position: absolute;
-//         top: 0;
-//         left: 0;
-//         right: 0;
-//         bottom: 0;
-//         animation: twinkle var(--twinkle-duration) ease-in-out infinite;
-
-//         &:nth-child(2) {
-//           animation-delay: calc(var(--twinkle-duration) * -0.33);
-//         }
-//         &:nth-child(3) {
-//           animation-delay: calc(var(--twinkle-duration) * -0.66);
-//         }
-
-//         @keyframes twinkle {
-//           25% {
-//             opacity: 0;
-//           }
-//         }
-//       }
-
-//       .star {
-//         fill: white;
-
-//         &:nth-child(3n) {
-//           opacity: 0.8;
-//         }
-//         &:nth-child(7n) {
-//           opacity: 0.6;
-//         }
-//         &:nth-child(13n) {
-//           opacity: 0.4;
-//         }
-//         &:nth-child(19n) {
-//           opacity: 0.2;
-//         }
-//       }
+  //       .volume_slider .slider-dot {
+  //           background-color: var(--theme-primary) !important;
+  //       }
+  //       .volume_slider .slider-process {
+  //           background-color: var(--theme-primary) !important;
+  //       }
+  //       .volume_slider .slider-piecewise {
+  //           background-color: color-mix(in srgb, var(--night-active-checkbox-border-color), rgb(255,255,255) 20%);
+  //           border-radius: 2px;
+  //       }
 
 
-//     `
-//   )
+  //       :root {
+  //         --twinkle-duration: 4s;
+  //       }
+
+  //       .stars-wrapper {
+  //         position: relative;
+  //         pointer-events: none;
+  //         width: 100vw;
+  //         height: 100vh;
+  //         background: rgb(0,0,0);
+  //         overflow: hidden;
+  //       }
+
+  //       .stars {
+  //         position: absolute;
+  //         top: 0;
+  //         left: 0;
+  //         right: 0;
+  //         bottom: 0;
+  //         animation: twinkle var(--twinkle-duration) ease-in-out infinite;
+
+  //         &:nth-child(2) {
+  //           animation-delay: calc(var(--twinkle-duration) * -0.33);
+  //         }
+  //         &:nth-child(3) {
+  //           animation-delay: calc(var(--twinkle-duration) * -0.66);
+  //         }
+
+  //         @keyframes twinkle {
+  //           25% {
+  //             opacity: 0;
+  //           }
+  //         }
+  //       }
+
+  //       .star {
+  //         fill: white;
+
+  //         &:nth-child(3n) {
+  //           opacity: 0.8;
+  //         }
+  //         &:nth-child(7n) {
+  //           opacity: 0.6;
+  //         }
+  //         &:nth-child(13n) {
+  //           opacity: 0.4;
+  //         }
+  //         &:nth-child(19n) {
+  //           opacity: 0.2;
+  //         }
+  //       }
+
+
+  //     `
+  //   )
 
   themeController.defineTheme(
     'green',
     'Зеленая',
     'night',
     `
-      <button class="btn btn-default">Зеленая</button>
-    `,
+        <button class="btn btn-default">Зеленая</button>
+      `,
     `
-      :root {
-        --theme-primary: #123311;
-        --night-background-color: #101010 !important;
-        --night-header-background-color: #171717 !important;
-      }
-    `,
+        :root {
+          --theme-primary: #123311;
+          --night-background-color: #101010 !important;
+          --night-header-background-color: #171717 !important;
+        }
+      `,
     themeTemplate
   )
 
@@ -958,51 +1202,51 @@
 
 
 
-// const id2 = GM_registerMenuCommand('Text2', function(){alert(123)}, { title: 'Two' })
+  // const id2 = GM_registerMenuCommand('Text2', function(){alert(123)}, { title: 'Two' })
 
 
 
-	const nativeWebSocket = unsafeWindow.WebSocket;
-	let conId
+  const nativeWebSocket = unsafeWindow.WebSocket;
+  let conId
 
-  function patchWebSocket(ws, onMessage, onSend){
-		ws.addEventListener("message", (event) => {
-			let msg = event.data
-			if(!msg.startsWith('42')){
-				return
-			}
-			msg = msg.slice(2)
-			msg = JSON.parse(msg)
+  function patchWebSocket(ws, onMessage, onSend) {
+    ws.addEventListener("message", (event) => {
+      let msg = event.data
+      if (!msg.startsWith('42')) {
+        return
+      }
+      msg = msg.slice(2)
+      msg = JSON.parse(msg)
       onMessage(msg)
-		})
+    })
 
     ws.nativeSend = ws.send
-    ws.send = (data)=>{
-      if(data == '2'){
+    ws.send = (data) => {
+      if (data == '2') {
         ws.nativeSend(data)
         return
       }
       let msg = JSON.parse(data.slice(2))
-      if (onSend(msg)){ return }
+      if (onSend(msg)) { return }
       ws.nativeSend(data)
     }
 
-		function _sendJson(data){
-			ws.nativeSend('42'+JSON.stringify(data))
+    function _sendJson(data) {
+      ws.nativeSend('42' + JSON.stringify(data))
       return true
-		}
+    }
 
 
-		window.ws = ws
+    window.ws = ws
 
     return [ws, _sendJson]
   }
 
   let block = false
 
-  function onMessage(msg){
+  function onMessage(msg) {
     const _conId = msg[1].connectionId
-    if(_conId){
+    if (_conId) {
       log('found connection id', _conId)
       conId = _conId
     }
@@ -1016,13 +1260,13 @@
 
 
 
-  function onSend(msg){
+  function onSend(msg) {
     // if(msg[1].type == 'web-agent'){
     //   log('blocked collection info (web agent)')
     //   return true
     // }
-    if(block){return true}
-    if(msg[1].type == 'set-fpt'){
+    if (block) { return true }
+    if (msg[1].type == 'set-fpt') {
       log('blocked collection info (font-data)')
       return true
     }
@@ -1031,20 +1275,20 @@
 
   let sendJson = null;
 
-  unsafeWindow.WebSocket = function(...args){
-		const ws = new nativeWebSocket(...args)
+  unsafeWindow.WebSocket = function (...args) {
+    const ws = new nativeWebSocket(...args)
     const [patchedWS, _sendJson] = patchWebSocket(ws, onMessage, onSend)
     // sendJson = patchedWS.nativeSend.bind(patchedWS)
     sendJson = _sendJson
-		return patchedWS
-	};
+    return patchedWS
+  };
 
 
 
-	function sendMute(muted){
-		log('set mute on connection id', conId)
-		sendJson(["event",{"type":"peer-mute","connectionId":conId,"muted":muted}])
-	}
+  function sendMute(muted) {
+    log('set mute on connection id', conId)
+    sendJson(["event", { "type": "peer-mute", "connectionId": conId, "muted": muted }])
+  }
 
 
   // document.querySelectorAll('.mute-button:not(#mute_button_spy)')
@@ -1054,7 +1298,7 @@
   let volumeInspectStop
 
   function patchRemoteAudio(stream) {
-    if(volumeInspectStop){ volumeInspectStop() }
+    if (volumeInspectStop) { volumeInspectStop() }
 
     const context = new AudioContext();
     const source = context.createMediaStreamSource(stream)
@@ -1096,14 +1340,14 @@
 
       // gainNode.gain.linearRampToValueAtTime(scaledGain, context.currentTime + 0.05)
 
-      let hahG = 1 - volume * 3
+      let hahG = 1 - volume * (settingsController.gainMul || 1)
       hahG = Math.max(0, hahG)
 
-      if(settingsController.gainVolume){
+      if (settingsController.gainVolume) {
         // gainNode.gain.linearRampToValueAtTime(scaledGain, context.currentTime + 0.05)
         gainNode.gain.value = hahG
       }
-      else{
+      else {
         gainNode.gain.value = 1
       }
       // gainNode.gain.value = 0
@@ -1113,14 +1357,14 @@
 
 
 
-      if(killme){ return }
+      if (killme) { return }
 
       requestAnimationFrame(updateVolume);
     }
 
     updateVolume();
 
-    volumeInspectStop = ()=>{
+    volumeInspectStop = () => {
       killme = true
       analyser.disconnect()
       context.close()
@@ -1139,29 +1383,29 @@
   const originalSetRemoteDescription = RTCPeerConnection.prototype.setRemoteDescription;
 
 
-    RTCPeerConnection.prototype.setRemoteDescription = async function (desc) {
-        const result = await originalSetRemoteDescription.call(this, desc);
+  RTCPeerConnection.prototype.setRemoteDescription = async function (desc) {
+    const result = await originalSetRemoteDescription.call(this, desc);
 
-        // Try to grab streams if they are already available
-        const pc = this;
-        setTimeout(() => {
-          const receivers = pc.getReceivers ? pc.getReceivers() : [];
-          receivers.forEach(receiver => {
-            const track = receiver.track;
-            if (track && track.kind === 'audio') {
-              const stream = new MediaStream([track]);
-              patchRemoteAudio(stream);
-            }
-          });
-        }, 100); // Slight delay to let receivers populate
+    // Try to grab streams if they are already available
+    const pc = this;
+    setTimeout(() => {
+      const receivers = pc.getReceivers ? pc.getReceivers() : [];
+      receivers.forEach(receiver => {
+        const track = receiver.track;
+        if (track && track.kind === 'audio') {
+          const stream = new MediaStream([track]);
+          patchRemoteAudio(stream);
+        }
+      });
+    }, 100); // Slight delay to let receivers populate
 
-        return result;
-      };
-
-
+    return result;
+  };
 
 
-    // muted
+
+
+  // muted
   // ss.getAudioTracks()[0].enabled = true
   // let _getUserMedia = unsafeWindow.navigator.mediaDevices.getUserMedia
   let micStream
@@ -1177,112 +1421,108 @@
 
 
 
-  class VolumeMuteIcon{
-		constructor(ogClassname){
+  class VolumeMuteIcon {
+    constructor(ogClassname, onToggle) {
       this.ogClassname = ogClassname
+      this.onToggle = onToggle
 
-			this.startObserver()
-		}
-
-		create(){
-      if(this.ogElem._ultima){ return }
-      this.ogElem._ultima = true
-      log('VolumeMuteIcon created')
-      this._event = this.ogElem.addEventListener('click', (e)=>{
-        if(e.layerX >= 0){ return }
-        volume.toggleMute()
-      })
-		}
-
-    remove(){
-      if(!this.ogElem){return}
-      this.ogElem.removeEventListener('click', this._event)
-
-      this.ogElem = null
+      this.startObserver()
     }
-    setMute(active){
-      if(active){
+
+    create() {
+      log('VolumeMuteIcon created')
+    }
+
+    remove() {
+      return
+    }
+    setMute(active) {
+      if (active) {
         this.ogElem.classList.add('no-sound')
       }
-      else{
+      else {
         this.ogElem.classList.remove('no-sound')
       }
     }
 
-		startObserver(){
-			this.disconnectObserver = VM.observe(unsafeWindow.document, () => {
-				const node = document.querySelector(this.ogClassname)
-        if(node){
-          this.ogElem = node
+    startObserver() {
+      this.disconnectObserver = VM.observe(unsafeWindow.document, () => {
+        this.ogElem = document.querySelector(this.ogClassname)
+
+        if (this.ogElem) {
           this.create()
         }
-        else{
+        else {
           this.remove()
         }
-			});
-		}
+      });
+    }
   }
 
 
   let volumeMuteIcon = new VolumeMuteIcon(
-    '.volume_slider'
+    '.volume_slider',
+    (isMuted) => {
+      console.log("force mute to", isMuted)
+      micStream.enabled = !isMuted
+    }
   )
 
 
 
-  class ForceMuteButton{
-		constructor(ogClassname, onToggle){
+  class ForceMuteButton {
+    constructor(ogClassname, onToggle) {
       this.ogClassname = ogClassname
       this.onToggle = onToggle
 
-			this.startObserver()
-		}
+      this.startObserver()
+    }
 
-		create(){
-      if (this.event){ return }
-      if (settingsController.autoMute){
+    create() {
+      if (this.event) { return }
+      if (settingsController.autoMute) {
         this.onToggle(!this.ogButton.classList.contains('muted'))
       }
       // log('forcemutebutton event created')
-      let e = (event)=>{
+      let e = (event) => {
         log('eeee event')
         event.preventDefault()
         event.stopImmediatePropagation()
         // const button = event.target
         this.onToggle(!this.ogButton.classList.contains('muted'))
         // button.classList.toggle('muted')
-			}
+      }
       this.ogButton.onclick = undefined
-			this.ogButton.addEventListener('click', e, true)
-			this.event = e
-		}
+      this.ogButton.addEventListener('click', e, true)
+      this.event = e
+    }
 
-    remove(){
-      if (!this.event){ return }
+    remove() {
+      if (!this.event) { return }
       // log('forcemutebutton event removed')
 
       // this.ogButton.removeEventListener(click, this.event)
       this.event = undefined
     }
 
-		startObserver(){
-			this.disconnectObserver = VM.observe(unsafeWindow.document, () => {
-				this.ogButton = document.querySelector(this.ogClassname)
+    startObserver() {
+      this.disconnectObserver = VM.observe(unsafeWindow.document, () => {
+        this.ogButton = document.querySelector(this.ogClassname)
 
-				if (this.ogButton) {
-					this.create()
-				}
-				else{
+        if (this.ogButton) {
+          this.create()
+        }
+        else {
           this.remove()
-				}
-			});
-		}
+        }
+      });
+    }
   }
 
 
   let forceMuteButton = new ForceMuteButton(
     '.mute-button:not(#mute_button_spy)',
-    (isMuted)=>{
+    (isMuted) => {
       console.log("force mute to", isMuted)
       micStream.enabled = !isMuted
       forceMuteButton.ogButton.classList.toggle('muted')
@@ -1290,87 +1530,87 @@
   )
 
 
-	const htmlFakeMuteButton = `<button type="button" id="mute_button_spy" class="mute-button mute_spy_on"></button>`
+  const htmlFakeMuteButton = `<button type="button" id="mute_button_spy" class="mute-button mute_spy_on"></button>`
 
-	class FakeMuteButton{
-		constructor(ogClassname, code, onToggle){
-			this.ogClassname = ogClassname
-			this.code = code
+  class FakeMuteButton {
+    constructor(ogClassname, code, onToggle) {
+      this.ogClassname = ogClassname
+      this.code = code
       this.onToggle = onToggle
 
-			this.startObserver()
-		}
+      this.startObserver()
+    }
 
-		create(){
-			if (this.elem){ return }
+    create() {
+      if (this.elem) { return }
       // log('button created')
-			const parent = this.ogButton.parentElement
-			parent.insertAdjacentHTML("beforeend", this.code)
-			const node = document.querySelector('#mute_button_spy')
-			node.onclick = (e)=>{
+      const parent = this.ogButton.parentElement
+      parent.insertAdjacentHTML("beforeend", this.code)
+      const node = document.querySelector('#mute_button_spy')
+      node.onclick = (e) => {
         const button = e.target
         this.onToggle(button.classList.contains('mute_spy_on'))
         button.classList.toggle('mute_spy_on')
         button.classList.toggle('mute_spy_off')
 
-			}
-			this.elem = node
-		}
+      }
+      this.elem = node
+    }
 
-    remove(){
-      if (!this.elem){ return }
+    remove() {
+      if (!this.elem) { return }
       // log('button removed')
       this.elem.remove()
       this.elem = undefined
     }
 
-		startObserver(){
-			this.disconnectObserver = VM.observe(unsafeWindow.document, () => {
-				this.ogButton = document.querySelector(this.ogClassname)
+    startObserver() {
+      this.disconnectObserver = VM.observe(unsafeWindow.document, () => {
+        this.ogButton = document.querySelector(this.ogClassname)
 
-				if (this.ogButton) {
-					this.create()
-				}
-				else{
+        if (this.ogButton) {
+          this.create()
+        }
+        else {
           this.remove()
-				}
-			});
-		}
+        }
+      });
+    }
 
 
-	}
+  }
 
 
-	let fakeMuteButton = new FakeMuteButton(
+  let fakeMuteButton = new FakeMuteButton(
     '.mute-button:not(#mute_button_spy)',
     htmlFakeMuteButton,
-    (isMuted)=>{
+    (isMuted) => {
       sendMute(isMuted)
     }
   )
 
-	styles.queue(
-		`.mute_spy_on{
-			background-image: url(${GM_getResourceURL('mic_on_spy')}) !important;
-		}
+    styles.queue(
+      `.mute_spy_on{
+        background-image: url(${resources.getURL('mic_on_spy')}) !important;
+      }
 
-		.mute_spy_off{
-			background-image: url(${GM_getResourceURL('mic_off_spy')}) !important;
-		}
+      .mute_spy_off{
+        background-image: url(${resources.getURL('mic_off_spy')}) !important;
+      }
 
-    .audio-chat .volume_slider.no-sound::after{
-			mask: url(${GM_getResourceURL('no_sound')}) no-repeat center / contain;
-		}
+      .audio-chat .volume_slider.no-sound::after{
+        mask: url(${resources.getURL('no_sound')}) no-repeat center / contain;
+      }
 
-    .audio-chat .volume_slider::after{
-			mask: url(${GM_getResourceURL('sound')}) no-repeat center / contain;
-      background-image: none !important;
-      background-color: var(--night-active-checkbox-background-color);
-      width: 17px !important;
-      height: 29px !important;
-		}
-    `
-  )
+      .audio-chat .volume_slider::after{
+        mask: url(${resources.getURL('sound')}) no-repeat center / contain;
+        background-image: none !important;
+        background-color: var(--night-active-checkbox-background-color);
+        width: 17px !important;
+        height: 29px !important;
+      }
+      `
+    )
 
 
 
@@ -1379,5 +1619,7 @@
   styles.injectWhenReady()
   // themeController.setFromStorageWhenReady()
 
-})()
+})();
+
+
 
