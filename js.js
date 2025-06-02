@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        nektomi [Ultima]
 // @match       https://nekto.me/audiochat*
-// @version     1.5.6.2
+// @version     1.5.7.0
 // @author      -
 // @description 6/3/2023, 2:04:02 AM
 // @namespace   ultima
@@ -124,10 +124,20 @@
 
 
 
-  const nativeAddEventListener = unsafeWindow.addEventListener
-  unsafeWindow.addEventListener = function (...args) {
-    if (args[0] == 'beforeunload') { return }
-    return nativeAddEventListener(...args)
+  const blockEvents = ['beforeunload', 'mousemove']
+
+  const nativeAddEventListener = EventTarget.prototype.addEventListener
+  EventTarget.prototype.addEventListener = function (...args) {
+    if (blockEvents.includes(args[0])){
+      log('addEventListener blocked', args[0])
+      return
+    }
+    // if (args[0] == 'beforeunload') { return }
+    // if ('mousemove' == args[0]) {
+    //   log('blocked', args)
+    //   return
+    // }
+    return nativeAddEventListener.call(this, ...args)
   }
 
 
@@ -171,7 +181,7 @@
 
     _dialogUpdated() {
       log('dialog updated', this.vue)
-      if (this.vue.endedDialog && settingsController.autoFindNew) {
+      if (this.vue.endedDialog && settingsController.settings.autoFindNew.value) {
         this.vue.toSearch()
       }
     }
@@ -419,6 +429,46 @@
   //  }
   // })
 
+
+  class Setting {
+    _value;
+    onValueChanged;
+
+    constructor(name){
+      this.name = name
+    }
+
+    get value(){
+      return this._value
+    }
+
+    set value(v){
+      this._value = v
+      // log('setting changed', this.name, v)
+      this.onValueChanged && this.onValueChanged(v)
+    }
+  }
+
+  class StoredSetting extends Setting {
+    constructor(name){
+      super(name)
+    }
+
+    get value(){
+      const value = super._value
+      if(value){ return value }
+
+      this._value = Storage.get(this.name)
+      return this._value
+    }
+
+    set value(v){
+      super.value = v
+      Storage.set(this.name, v)
+    }
+  }
+
+
   class SettingsController {
     html = `
         <div class="dropdown">
@@ -443,7 +493,7 @@
           display: none;
           flex-direction: row-reverse;
           position: absolute;
-
+          column-gap: 10px;
           color: var(--night-text-color);
           min-width: 160px;
           right: 0;
@@ -456,9 +506,10 @@
 
         .setting-level {
           display: none;
-          min-width: 150px;
+          min-width: 160px;
           background-color: var(--night-background-color);
           padding: 5px;
+          transform: translateZ(0); /* promote to use gpu (without it when second setting-level is showing another get blur) */
         }
 
         .setting-level-main {
@@ -497,11 +548,11 @@
         }
 
         .settings-show {
-          display:flex;
+          display: flex;
         }
 
         .settings-level-show {
-          display: unset !important;
+          display: block !important;
         }
 
         div.navbar-header {
@@ -524,6 +575,7 @@
 
 
     _waitToApply = []
+    settings = {}
 
     constructor() {
       this.autoFindNew = false
@@ -533,6 +585,12 @@
     init() {
       styles.queue(this.css)
       log('settings loaded')
+    }
+
+    addStoredSetting(name){
+      const setting = new StoredSetting(name)
+      this.settings[name] = setting
+      return setting
     }
 
     addSettingLevel(id, label) {
@@ -566,24 +624,50 @@
       )
     }
 
-    addCheckbox(parent, callback) {
-      const checkbox = this._appendElem(
+    addCheckbox(parent) {
+      const elem = this._appendElem(
         parent,
         `<input class="ultima" type="checkbox">`
       )
-      checkbox.addEventListener('change', callback)
-      return checkbox
+      function addValueChanged(callback){
+        elem.addEventListener('change', (e)=>{callback(e.target.checked)})
+      }
+      function setValue(value){
+        elem.checked = value
+      }
+      return [elem, addValueChanged, setValue]
     }
 
-    addRange(parent, callback) {
-      const checkbox = this._appendElem(
+    addRange(parent, params) {
+      params = typeof params !== typeof undefined ? params : {min:0, max:1, step:0.05}
+
+      const elem = this._appendElem(
         parent,
-        `<input class="ultima" type="range">`
+        `<input class="ultima" type="range" min="${params.min}" max="${params.max}" step="${params.step}">`
       )
-      checkbox.addEventListener('input', callback)
-      return checkbox
+
+      function addValueChanged(callback){
+        elem.addEventListener('input', (e)=>{callback(e.target.value)})
+      }
+      function setValue(value){
+        elem.value = value
+      }
+      return [elem, addValueChanged, setValue]
     }
 
+    asPersistentSetting(elemObj, setting){
+      const [elem, addValueChanged, setValue] = elemObj
+      const storedVal = setting.value
+      storedVal && setValue(storedVal)
+      setting.onValueChanged = (val)=>{
+        // log('onvaluechanged from', setting, 'to', val, 'elem', elem)
+        setValue(val)
+      }
+      addValueChanged((val)=>{
+        setting.value = val
+        // log('input from persist', val)
+      })
+    }
 
     _appendElemBySelector(selector, html) {
       const parent = this.node.querySelector(selector)
@@ -596,48 +680,6 @@
       return newElement
     }
 
-
-
-    async addCategory(id, description) {
-      const category = await this._addElemWhenReady(
-        '#settingsDropdown',
-        `<div id="${id}" class="setting-level">${id}</div>`
-      )
-      const elem = await this._addElemWhenReady(
-        '#settingsDropdown > div:nth-child(1)',
-        `<div class="settings-row">
-                <div class="ultima-icon"></div>
-                <span class="ultima">${description}</span>
-              </div>`
-      )
-      const icon = elem.querySelector('.ultima-icon')
-      this._setSvgFromResource(icon, 'settings')
-      icon.addEventListener('click', () => {
-        category.classList.toggle('settings-level-show')
-      })
-    }
-
-    async addCategoryWithCheckbox(id, description, callback) {
-      const category = await this._addElemWhenReady(
-        '#settingsDropdown',
-        `<div id="${id}" class="setting-level">${id}</div>`
-      )
-      const elem = await this._addElemWhenReady(
-        '#settingsDropdown > div:nth-child(1)',
-        `<div class="settings-row">
-                <div class="ultima-icon"></div>
-                <span class="ultima">${description}</span>
-                <input class="ultima" type="checkbox">
-              </div>`
-      )
-      const checkbox = elem.querySelector('input[type="checkbox"]')
-      checkbox.addEventListener('change', callback)
-      const icon = elem.querySelector('.ultima-icon')
-      this._setSvgFromResource(icon, 'settings')
-      icon.addEventListener('click', () => {
-        category.classList.toggle('settings-level-show')
-      })
-    }
 
     _applyFromWait() {
       for (const func of this._waitToApply) {
@@ -689,20 +731,31 @@
   settingsController.onReadyAdditional = function () {
     const row1 = this.addSettingRow(this.settingsMain)
     this.addLabel(row1, 'auto find new')
-    this.addCheckbox(row1, (event) => {
-      settingsController.autoFindNew = event.target.checked
-      log('changed', settingsController.autoFindNew)
-    })
+    this.asPersistentSetting(
+      this.addCheckbox(row1),
+      this.addStoredSetting('autoFindNew')
+    )
 
 
         const level_gain = this.addSettingLevel(1, 'gain')
         const gain_row1 = this.addSettingRow(level_gain)
-        this.addRange(gain_row1, (event) => {
-          let val = event.target.value
-          val = Math.max(1, val / 30)
-          log('gainmul', val)
-          settingsController.gainMul = val
-        })
+
+        this.asPersistentSetting(
+          this.addRange(
+            gain_row1,
+            {min:1, max:4, step:0.05}
+          ),
+          this.addStoredSetting('gainMul')
+        )
+
+        const gain_row2 = this.addSettingRow(level_gain)
+        this.addLabel(gain_row2, 'gain on new')
+        this.asPersistentSetting(
+          this.addCheckbox(
+            gain_row2
+          ),
+          this.addStoredSetting('gainOnNew')
+        )
 
 
         const row2 = this.addSettingRow(this.settingsMain)
@@ -710,16 +763,18 @@
           level_gain.classList.toggle('settings-level-show')
         })
         this.addLabel(row2, 'gain volume')
-        this.addCheckbox(row2, (event) => {
-          settingsController.gainVolume = event.target.checked
-        })
+        this.asPersistentSetting(
+          this.addCheckbox(row2),
+          this.addStoredSetting('gainEnabled')
+        )
 
 
         const row3 = this.addSettingRow(this.settingsMain)
         this.addLabel(row3, 'mic mute on new')
-        this.addCheckbox(row3, (event) => {
-          settingsController.autoMute = event.target.checked
-        })
+        this.asPersistentSetting(
+          this.addCheckbox(row3),
+          this.addStoredSetting('muteOnNew')
+        )
 
 
 
@@ -789,7 +844,6 @@
       const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: "2-digit", hourCycle: 'h23' })
       if (timeElem.innerHTML != time) {
         timeElem.innerHTML = time
-        log('timme updt')
       }
     }
 
@@ -1340,10 +1394,10 @@
 
       // gainNode.gain.linearRampToValueAtTime(scaledGain, context.currentTime + 0.05)
 
-      let hahG = 1 - volume * (settingsController.gainMul || 1)
+      let hahG = 1 - volume * (settingsController.settings.gainMul.value || 1)
       hahG = Math.max(0, hahG)
 
-      if (settingsController.gainVolume) {
+      if (settingsController.settings.gainEnabled.value) {
         // gainNode.gain.linearRampToValueAtTime(scaledGain, context.currentTime + 0.05)
         gainNode.gain.value = hahG
       }
@@ -1480,8 +1534,12 @@
 
     create() {
       if (this.event) { return }
-      if (settingsController.autoMute) {
+      if (settingsController.settings.muteOnNew.value) {
         this.onToggle(!this.ogButton.classList.contains('muted'))
+      }
+      if (settingsController.settings.gainOnNew.value){
+        log('gain on new now')
+        settingsController.settings.gainEnabled.value = true
       }
       // log('forcemutebutton event created')
       let e = (event) => {
