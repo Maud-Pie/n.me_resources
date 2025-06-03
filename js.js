@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        nektomi [Ultima]
 // @match       https://nekto.me/audiochat*
-// @version     1.5.7.0
+// @version     1.5.8.0
 // @author      -
 // @description 6/3/2023, 2:04:02 AM
 // @namespace   ultima
@@ -124,10 +124,11 @@
 
 
 
-  const blockEvents = ['beforeunload', 'mousemove']
+  const blockEvents = ['beforeunload', 'mousemove', 'beforeinstallprompt']
 
   const nativeAddEventListener = EventTarget.prototype.addEventListener
   EventTarget.prototype.addEventListener = function (...args) {
+    // log('event', args)
     if (blockEvents.includes(args[0])){
       log('addEventListener blocked', args[0])
       return
@@ -153,6 +154,22 @@
     return audio
   }
 
+  unsafeWindow.navigator.vibrate = ()=>{}
+  let nativeWakeLockRequest = unsafeWindow.navigator.wakeLock.request
+  nativeWakeLockRequest = nativeWakeLockRequest.bind(unsafeWindow.navigator.wakeLock)
+  unsafeWindow.navigator.wakeLock.request = (...args)=>{
+    if(document.hidden){
+      log('wakelock reject - window is hidden')
+      return new Promise((resolve, reject) => {
+          resolve({
+            addEventListener: ()=>{},
+            release: ()=>{}
+          })
+      })
+    }
+    return nativeWakeLockRequest(...args)
+  }
+
 
 
 
@@ -170,7 +187,6 @@
 
   class DialogController {
     constructor() {
-      this.dialogStoppedByKey = false
       this.init()
     }
 
@@ -179,10 +195,29 @@
       this.keydownListenForBindings()
     }
 
-    _dialogUpdated() {
-      log('dialog updated', this.vue)
+    activeConnectionIdChanged() {
+      log('dialog changed', this.vue)
       if (this.vue.endedDialog && settingsController.settings.autoFindNew.value) {
         this.vue.toSearch()
+      }
+    }
+
+    timeChanged(time) {
+      if(settingsController.settings.skipTimeout.value && time >= 15 && time < 20 && !micStream.enabled){
+        log('muted dialog skipped')
+        this.leaveDialog()
+      }
+      if(settingsController.settings.skipBadConnection.value && time >= 5 && this.vue.bytesReceived < 100){
+        log('bad connection skipped')
+        this.leaveDialog()
+      }
+    }
+
+    streamReceived(){
+      if (settingsController.settings.gainOnNew.value && !this.vue._gainAutoEnabled){
+        log('gain on new now')
+        settingsController.settings.gainEnabled.value = true
+        this.vue._gainAutoEnabled = true
       }
     }
 
@@ -196,47 +231,68 @@
         this._unpatchVue()
       }
       this.vue = vue
-      log('dialog vue patching')
+      // log('dialog vue patching', vue)
       unsafeWindow.v = vue
       vue.breakDialog = this.leaveDialog.bind(this)
-      const unwatch = vue.$store.watch(() => vue.$store.state.chat.activeConnectionId, () => {
-        this._dialogUpdated()
-      })
+
+      const unwatchList = []
+
+      unwatchList.push(
+        vue.$store.watch(() => vue.$store.state.chat.activeConnectionId, () => {
+          this.activeConnectionIdChanged()
+        })
+      )
+      unwatchList.push(
+        vue.$store.watch(() =>  vue.callTime, () => {
+          this.timeChanged(vue.callTime)
+        })
+      )
+      unwatchList.push(
+        vue.$store.watch(() =>  vue.streamReceived, () => {
+          this.streamReceived()
+        })
+      )
+
 
       this._unpatchVue = () => {
         // add other unpatch if needed
-        log('unpatching vue')
-        unwatch()
+        // log('unpatching vue')
+        for(const f of unwatchList){
+          f()
+        }
       }
 
     }
+
+    // getDialogFromWraps(node){
+    //   const wraps = node.__vue__
+    //   for(const child of wraps.$children){
+    //     const tag = child.$vnode.tag
+    //     if(tag.includes('DialogScreen')){
+    //       return child
+    //     }
+    //   }
+    // }
 
     observeForDialogScreen() {
       VM.observe(unsafeWindow.document, () => {
         const node = unsafeWindow.document.querySelector(".wraps")
         if (!node) { return }
 
-        const c = node.__vue__.$createElement
+        const _createElement = node.__vue__.$createElement
         node.__vue__.$createElement = (...args) => {
-          // log('createElement', ...args)
           if (args[0].name == 'DialogScreen') {
             const dialog = args[0]
             if (!dialog._staticRender) {
               dialog._staticRender = dialog.staticRenderFns[0]
-              // log('render setted')
             }
-            const patch = this._patchVue.bind(this)
+            const patchVue = this._patchVue.bind(this)
             dialog.staticRenderFns[0] = function (...render_args) {
-              // log('render', render_args.length, ...render_args)
-              patch(this)
-              // log('render inside og - ', dialog._staticRender)
+              patchVue(this)
               return dialog._staticRender.call(this, ...render_args)
             }
-            // log('setting render og - ', dialog._staticRender, ' \n\n new is -', dialog.staticRenderFns[0])
-
-            return c(...args)
           }
-          return c(...args)
+          return _createElement(...args)
         }
 
         return true
@@ -252,7 +308,6 @@
 
           if (this.vue.activeConnectionId) {
             this.leaveDialog()
-            // this.dialogStoppedByKey = true
           }
           this.vue.toSearch()
 
@@ -299,12 +354,15 @@
           this.originalAudioOutput = vue.$refs.audioElement
           this.audioOutput = document.createElement('audio')
           this.audioOutput.autoplay = true
-          this.originalAudioOutput.parentElement.appendChild(this.audioOutput);
-          vue.changeVolume = (value) => {
+          this.originalAudioOutput.parentElement.appendChild(this.audioOutput)
+
+          const nativeChangeVolume = vue.changeVolume
+          vue.changeVolume = (v) => {
+            nativeChangeVolume(v)
             this.originalAudioOutput.volume = 0
-            this.set(value)
-            log("set vol", value / 100)
+            this._appChangedValue(v)
           }
+          this._changeVolume = vue.changeVolume
           return true
         }
       })
@@ -315,27 +373,47 @@
         const code = event.code
         if (code == keyVolumeMute) {
           event.stopImmediatePropagation()
-          this._prevVolume = this.get()
-          this.set(0)
-          volumeMuteIcon.setMute(true)
+          this.muted = true
         }
         if (code == keyVolumeUnmute) {
           event.stopImmediatePropagation()
-          this.set(this._prevVolume)
-          volumeMuteIcon.setMute(false)
+          this.muted = false
         }
       })
     }
 
-    set(value) {
-      if (value > 1) {
-        value = value / 100
+    set muted(isMuted){
+      if(isMuted){
+        this._prevVolume = this.value
+        this.value = 0
       }
-      this.audioOutput.volume = value
+      else{
+        this.value = this._prevVolume || 1
+      }
     }
 
-    get() {
+    get muted(){
+      return this.value == 0
+    }
+
+    set value(v){
+      this._changeVolume(v)
+      this.displayValue()
+    }
+
+    _appChangedValue(v) {
+      if (v > 1) {
+        v = v / 100
+      }
+      this.audioOutput.volume = v
+    }
+
+    get value() {
       return this.audioOutput.volume
+    }
+
+    displayValue(){
+      volumeMuteIcon.muted = this.muted
     }
   }
 
@@ -728,6 +806,7 @@
   }
 
   const settingsController = new SettingsController()
+
   settingsController.onReadyAdditional = function () {
     const row1 = this.addSettingRow(this.settingsMain)
     this.addLabel(row1, 'auto find new')
@@ -737,44 +816,70 @@
     )
 
 
-        const level_gain = this.addSettingLevel(1, 'gain')
-        const gain_row1 = this.addSettingRow(level_gain)
+    const level_gain = this.addSettingLevel(1, 'gain')
+    const gain_row1 = this.addSettingRow(level_gain)
 
-        this.asPersistentSetting(
-          this.addRange(
-            gain_row1,
-            {min:1, max:4, step:0.05}
-          ),
-          this.addStoredSetting('gainMul')
-        )
+    this.asPersistentSetting(
+      this.addRange(
+        gain_row1,
+        {min:1, max:4, step:0.05}
+      ),
+      this.addStoredSetting('gainMul')
+    )
 
-        const gain_row2 = this.addSettingRow(level_gain)
-        this.addLabel(gain_row2, 'gain on new')
-        this.asPersistentSetting(
-          this.addCheckbox(
-            gain_row2
-          ),
-          this.addStoredSetting('gainOnNew')
-        )
-
-
-        const row2 = this.addSettingRow(this.settingsMain)
-        this.addIcon(row2, 'settings').addEventListener('click', () => {
-          level_gain.classList.toggle('settings-level-show')
-        })
-        this.addLabel(row2, 'gain volume')
-        this.asPersistentSetting(
-          this.addCheckbox(row2),
-          this.addStoredSetting('gainEnabled')
-        )
+    const gain_row2 = this.addSettingRow(level_gain)
+    this.addLabel(gain_row2, 'gain on new')
+    this.asPersistentSetting(
+      this.addCheckbox(
+        gain_row2
+      ),
+      this.addStoredSetting('gainOnNew')
+    )
 
 
-        const row3 = this.addSettingRow(this.settingsMain)
-        this.addLabel(row3, 'mic mute on new')
-        this.asPersistentSetting(
-          this.addCheckbox(row3),
-          this.addStoredSetting('muteOnNew')
-        )
+    const row2 = this.addSettingRow(this.settingsMain)
+    this.addIcon(row2, 'settings').addEventListener('click', () => {
+      level_gain.classList.toggle('settings-level-show')
+    })
+    this.addLabel(row2, 'gain volume')
+    this.asPersistentSetting(
+      this.addCheckbox(row2),
+      this.addStoredSetting('gainEnabled')
+    )
+
+
+    const row3 = this.addSettingRow(this.settingsMain)
+    this.addLabel(row3, 'mic mute on new')
+    this.asPersistentSetting(
+      this.addCheckbox(row3),
+      this.addStoredSetting('muteOnNew')
+    )
+
+
+    const level_other = this.addSettingLevel(2, 'other')
+    const other_row1 = this.addSettingRow(level_other)
+    this.addLabel(other_row1, 'skip timeout')
+    this.asPersistentSetting(
+      this.addCheckbox(
+        other_row1
+      ),
+      this.addStoredSetting('skipTimeout')
+    )
+    const other_row2 = this.addSettingRow(level_other)
+    this.addLabel(other_row2, 'skip bad conn')
+    this.asPersistentSetting(
+      this.addCheckbox(
+        other_row2
+      ),
+      this.addStoredSetting('skipBadConnection')
+    )
+
+    const row4 = this.addSettingRow(this.settingsMain)
+    this.addIcon(row4, 'settings').addEventListener('click', () => {
+      level_other.classList.toggle('settings-level-show')
+    })
+    this.addLabel(row4, 'other')
+
 
 
 
@@ -818,6 +923,10 @@
         .navbar-header {
           display: flex;
           justify-content: space-between;
+        }
+
+        .pritch {
+          display: none !important;
         }
 
       `
@@ -913,7 +1022,17 @@
 
     injectWhenReady() {
       VM.observe(unsafeWindow.document, () => {
-        const node = unsafeWindow.document.querySelector('div.chat-step.idle')
+        let node
+        const cont = unsafeWindow.document.querySelector('div:has(> div.chat-step:not(.error-1))')
+        if(cont?.__vue__){
+          node = cont
+        }
+        else{
+          const step = unsafeWindow.document.querySelector('div.chat-step.idle')
+          if(step?.__vue__){
+            node = step
+          }
+        }
         if (node && node.__vue__) {
           const vue = node.__vue__
           unsafeWindow.v = vue
@@ -1096,10 +1215,6 @@
 
 
         div.container.tabs_type_chats {
-          display: none !important;
-        }
-
-        .pritch {
           display: none !important;
         }
 
@@ -1358,7 +1473,7 @@
     const source = context.createMediaStreamSource(stream)
     const dest = context.createMediaStreamDestination()
     // const source = context.createMediaElementSource(node)
-    log("patch stream", stream)
+    // log("patch stream", stream)
 
     const gainNode = context.createGain()
     const analyser = context.createAnalyser()
@@ -1394,7 +1509,7 @@
 
       // gainNode.gain.linearRampToValueAtTime(scaledGain, context.currentTime + 0.05)
 
-      let hahG = 1 - volume * (settingsController.settings.gainMul.value || 1)
+      let hahG = 1 - volume * (settingsController.settings.gainMul.value || 2)
       hahG = Math.max(0, hahG)
 
       if (settingsController.settings.gainEnabled.value) {
@@ -1476,6 +1591,9 @@
 
 
   class VolumeMuteIcon {
+
+    _event;
+
     constructor(ogClassname, onToggle) {
       this.ogClassname = ogClassname
       this.onToggle = onToggle
@@ -1484,14 +1602,24 @@
     }
 
     create() {
-      log('VolumeMuteIcon created')
+      this._event = this.ogElem.addEventListener('click', (e)=>{
+        if(e.offsetX < 0){
+          // icon pressed
+          volume.muted = !volume.muted
+        }
+      })
     }
 
     remove() {
-      return
+      this.ogElem.removeEventListener('click', this._event)
     }
-    setMute(active) {
-      if (active) {
+
+    get muted(){
+      return this.ogElem.classList.contains('no-sound')
+    }
+
+    set muted(isMuted){
+      if (isMuted) {
         this.ogElem.classList.add('no-sound')
       }
       else {
@@ -1499,28 +1627,25 @@
       }
     }
 
+
     startObserver() {
       this.disconnectObserver = VM.observe(unsafeWindow.document, () => {
-        this.ogElem = document.querySelector(this.ogClassname)
+        const newOgElem = document.querySelector(this.ogClassname)
 
-        if (this.ogElem) {
+        if (newOgElem && !this.ogElem) {
+          this.ogElem = newOgElem
           this.create()
         }
-        else {
+        else if(!newOgElem && this.ogElem) {
           this.remove()
+          this.ogElem = null
         }
       });
     }
   }
 
 
-  let volumeMuteIcon = new VolumeMuteIcon(
-    '.volume_slider',
-    (isMuted) => {
-      console.log("force mute to", isMuted)
-      micStream.enabled = !isMuted
-    }
-  )
+  let volumeMuteIcon = new VolumeMuteIcon('.volume_slider')
 
 
 
@@ -1532,18 +1657,22 @@
       this.startObserver()
     }
 
+    get muted(){
+      return this.ogButton.classList.contains('muted')
+    }
+
+    set muted(isMuted){
+      micStream.enabled = !isMuted
+    }
+
     create() {
       if (this.event) { return }
       if (settingsController.settings.muteOnNew.value) {
-        this.onToggle(!this.ogButton.classList.contains('muted'))
-      }
-      if (settingsController.settings.gainOnNew.value){
-        log('gain on new now')
-        settingsController.settings.gainEnabled.value = true
+        this.onToggle(!this.muted)
       }
       // log('forcemutebutton event created')
       let e = (event) => {
-        log('eeee event')
+        // log('eeee event')
         event.preventDefault()
         event.stopImmediatePropagation()
         // const button = event.target
