@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        nektomi [Ultima]
 // @match       https://nekto.me/audiochat*
-// @version     1.5.8.0
+// @version     1.5.9.0
 // @author      -
 // @description 6/3/2023, 2:04:02 AM
 // @namespace   ultima
@@ -16,6 +16,7 @@
 // @resource    no_sound https://raw.githubusercontent.com/Maud-Pie/n.me_resources/refs/heads/main/no-sound.svg?v=2
 // @resource    sound https://raw.githubusercontent.com/Maud-Pie/n.me_resources/refs/heads/main/sound.svg?v=2
 // @resource    settings https://raw.githubusercontent.com/Maud-Pie/n.me_resources/refs/heads/main/settings.svg?v=2
+// @resource    menu https://raw.githubusercontent.com/Maud-Pie/n.me_resources/refs/heads/main/ic_menu_white_48d.svg
 // @require     https://cdn.jsdelivr.net/npm/@violentmonkey/dom@2
 // @grant       unsafeWindow
 // @grant       GM_registerMenuCommand
@@ -150,6 +151,12 @@
     if (args.length == 1 && args[0].includes('connect.mp3')) {
       log('found audio shitty print', args[0])
       audio.volume = 0.1
+    }
+
+    const nativePause = audio.pause
+    audio.pause = ()=>{
+      // log('audio pause')
+      // fix error Uncaught (in promise) AbortError: The play() request was interrupted by a call to pause(). https://goo.gl/LdLk22
     }
     return audio
   }
@@ -511,9 +518,13 @@
   class Setting {
     _value;
     onValueChanged;
+    _defaultValue;
 
-    constructor(name){
+    constructor(name, options){
       this.name = name
+      if(options && options.defaultValue !== undefined){
+        this._defaultValue = options.defaultValue
+      }
     }
 
     get value(){
@@ -528,16 +539,19 @@
   }
 
   class StoredSetting extends Setting {
-    constructor(name){
-      super(name)
-    }
-
     get value(){
-      const value = super._value
-      if(value){ return value }
+      const v = super.value
+      if(v){ return v }
 
-      this._value = Storage.get(this.name)
-      return this._value
+      const stored_v = Storage.get(this.name)
+      if(stored_v !== undefined){
+        super.value = stored_v
+        return stored_v
+      }
+      else{
+        super.value = this._defaultValue
+        return this._defaultValue
+      }
     }
 
     set value(v){
@@ -584,7 +598,7 @@
 
         .setting-level {
           display: none;
-          min-width: 160px;
+          min-width: 200px;
           background-color: var(--night-background-color);
           padding: 5px;
           transform: translateZ(0); /* promote to use gpu (without it when second setting-level is showing another get blur) */
@@ -648,6 +662,15 @@
           transform: scale(1.0);
           margin: 10px;
         }
+
+        select.ultima {
+            background-color: var(--night-active-checkbox-background-color);
+            outline: none;
+        }
+
+        select.ultima > option {
+          background-color: var(--night-active-checkbox-background-color) !important;
+        }
       `
 
 
@@ -665,8 +688,8 @@
       log('settings loaded')
     }
 
-    addStoredSetting(name){
-      const setting = new StoredSetting(name)
+    addStoredSetting(name, options){
+      const setting = new StoredSetting(name, options)
       this.settings[name] = setting
       return setting
     }
@@ -700,6 +723,26 @@
         parent,
         `<span class="ultima">${label}</span>`
       )
+    }
+
+    addSelect(parent, options){
+      const elem = this._appendElem(
+        parent,
+        `<select class="ultima"></select>`
+      )
+      for(const [optionId, optionName] of Object.entries(options)){
+        const option = `<option value="${optionId}">${optionName}</option>`
+        this._appendElem(elem, option)
+      }
+
+      function addValueChanged(callback){
+        elem.addEventListener('change', (e)=>{callback(e.target.value)})
+      }
+
+      function setValue(value){
+        elem.value = value
+      }
+      return [elem, addValueChanged, setValue]
     }
 
     addCheckbox(parent) {
@@ -736,6 +779,7 @@
     asPersistentSetting(elemObj, setting){
       const [elem, addValueChanged, setValue] = elemObj
       const storedVal = setting.value
+      // log('setting', setting, setting.value)
       storedVal && setValue(storedVal)
       setting.onValueChanged = (val)=>{
         // log('onvaluechanged from', setting, 'to', val, 'elem', elem)
@@ -817,6 +861,18 @@
 
 
     const level_gain = this.addSettingLevel(1, 'gain')
+
+    const gain_row3 = this.addSettingRow(level_gain)
+    this.addLabel(gain_row3, 'method')
+    this.asPersistentSetting(
+      this.addSelect(gain_row3, {
+        'multiply': 'Multiply',
+        'limit': 'Limit',
+        'pow': 'PowerFunc'
+      }),
+      this.addStoredSetting('gainMethod', {'defaultValue': 'multiply'})
+    )
+
     const gain_row1 = this.addSettingRow(level_gain)
 
     this.asPersistentSetting(
@@ -824,17 +880,19 @@
         gain_row1,
         {min:1, max:4, step:0.05}
       ),
-      this.addStoredSetting('gainMul')
+      this.addStoredSetting('gainMul', {'defaultValue': 4})
     )
 
     const gain_row2 = this.addSettingRow(level_gain)
-    this.addLabel(gain_row2, 'gain on new')
+    this.addLabel(gain_row2, 'enable on new')
     this.asPersistentSetting(
       this.addCheckbox(
         gain_row2
       ),
       this.addStoredSetting('gainOnNew')
     )
+
+
 
 
     const row2 = this.addSettingRow(this.settingsMain)
@@ -1222,6 +1280,12 @@
           display: none !important;
         }
 
+        /*
+        .go-idle-button {
+          background-image: url(${resources.getURL('menu')}) !important;
+        }
+        */
+
     `
 
 
@@ -1460,7 +1524,26 @@
   }
 
 
-  // document.querySelectorAll('.mute-button:not(#mute_button_spy)')
+
+  function multiplyMethod(volume, multiplyer) {
+    return (volume / 255) * multiplyer
+  }
+
+  function powMethod(volume, multiplyer) {
+    const n_volume = (volume / 255)
+    return Math.pow(2, n_volume) / 3
+  }
+
+  function limitMethod(volume, trigger, maxVolume) {
+    if (volume <= trigger) return 0;
+    const normalized = (volume - trigger) / (maxVolume - trigger);
+    return normalized
+  }
+
+
+
+
+
 
 
 
@@ -1489,32 +1572,30 @@
 
     let killme = false
 
-    // Step 5: Monitor and adjust volume
-    let smoothedVolume = 0;
     function updateVolume() {
       analyser.getByteFrequencyData(dataArray)
-      const average = dataArray.reduce((a, b) => a + b) / dataArray.length
-
-      const volume = average / 255;
-
-      // Smooth it (exponential moving average)
-      smoothedVolume = smoothedVolume * 0.3 + volume * 0.4;
-
-      // Optional: scale or clamp
-      const minGain = 0.1
-      const maxGain = 1
-      const scaledGain = minGain + (maxGain - minGain) * smoothedVolume;
-
-      // Smooth gain changes using linear ramp
-
-      // gainNode.gain.linearRampToValueAtTime(scaledGain, context.currentTime + 0.05)
-
-      let hahG = 1 - volume * (settingsController.settings.gainMul.value || 2)
-      hahG = Math.max(0, hahG)
+      const volume = dataArray.reduce((a, b) => a + b) / dataArray.length
 
       if (settingsController.settings.gainEnabled.value) {
-        // gainNode.gain.linearRampToValueAtTime(scaledGain, context.currentTime + 0.05)
-        gainNode.gain.value = hahG
+        let gainValue = 0
+
+        if (settingsController.settings.gainMethod.value == 'multiply'){
+          gainValue = multiplyMethod(volume, settingsController.settings.gainMul.value)
+        }
+        else if (settingsController.settings.gainMethod.value == 'limit'){
+          gainValue = limitMethod(volume, 20, 60)
+        }
+        else if (settingsController.settings.gainMethod.value == 'pow'){
+          gainValue = powMethod(volume)
+        }
+
+        gainValue = 1 - gainValue
+        gainValue = Math.max(0, gainValue)
+        gainValue = Math.min(1, gainValue)
+
+        // log('method', settingsController.settings.gainMethod.value, 'volume', volume, 'gain', gainValue)
+
+        gainNode.gain.value = gainValue
       }
       else {
         gainNode.gain.value = 1
