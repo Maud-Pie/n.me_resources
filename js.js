@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        nektomi [Ultima]
 // @match       https://nekto.me/audiochat*
-// @version     1.5.9.0
+// @version     1.5.9.1
 // @author      -
 // @description 6/3/2023, 2:04:02 AM
 // @namespace   ultima
@@ -210,7 +210,7 @@
     }
 
     timeChanged(time) {
-      if(settingsController.settings.skipTimeout.value && time >= 15 && time < 20 && !micStream.enabled){
+      if(settingsController.settings.skipTimeout.value && time >= 15 && time < 20 && !microphone.enabled){
         log('muted dialog skipped')
         this.leaveDialog()
       }
@@ -930,6 +930,15 @@
         other_row2
       ),
       this.addStoredSetting('skipBadConnection')
+    )
+
+    const other_row3 = this.addSettingRow(level_other)
+    this.addLabel(other_row3, 'persist mute')
+    this.asPersistentSetting(
+      this.addCheckbox(
+        other_row3
+      ),
+      this.addStoredSetting('microphoneMutePersistent')
     )
 
     const row4 = this.addSettingRow(this.settingsMain)
@@ -1655,31 +1664,120 @@
 
 
 
-  // muted
-  // ss.getAudioTracks()[0].enabled = true
-  // let _getUserMedia = unsafeWindow.navigator.mediaDevices.getUserMedia
-  let micStream
-  let _getUserMedia = unsafeWindow.navigator.mediaDevices.getUserMedia.bind(unsafeWindow.navigator.mediaDevices);
-  unsafeWindow.navigator.mediaDevices.getUserMedia = (...args) => {
-    return _getUserMedia(...args)
-      .then(stream => {
-        // log("micstream", stream)
-        micStream = stream.getAudioTracks()[0]
-        return stream
-      })
+
+  // let micStream
+  // let _getUserMedia = unsafeWindow.navigator.mediaDevices.getUserMedia.bind(unsafeWindow.navigator.mediaDevices);
+  // unsafeWindow.navigator.mediaDevices.getUserMedia = (...args) => {
+  //   return _getUserMedia(...args)
+  //     .then(stream => {
+  //       log("micstream", stream)
+  //       micStream = stream.getAudioTracks()[0]
+  //       return stream
+  //     })
+  // }
+
+
+  class Microphone {
+    _stream;
+    __getUserMedia;
+    _persistentStreamEnabled = true;
+
+    constructor(){
+      this.init()
+    }
+
+    init(){
+      this.patchGetUserMedia()
+    }
+
+    get enabled(){
+      return this._stream.enabled
+    }
+
+    set enabled(v){
+      this._stream.enabled = v
+      this._persistentStreamEnabled = v
+    }
+
+
+    streamChanged(){
+      if(settingsController.settings.microphoneMutePersistent.value){
+        log('persist', this._persistentStreamEnabled)
+        this.enabled = this._persistentStreamEnabled
+      }
+    }
+
+    patchGetUserMedia(){
+      this.__getUserMedia = unsafeWindow.navigator.mediaDevices.getUserMedia.bind(unsafeWindow.navigator.mediaDevices)
+
+      unsafeWindow.navigator.mediaDevices.getUserMedia = (...args) => {
+        return this.__getUserMedia(...args)
+          .then(stream => {
+            log("micstream", stream)
+            this._stream = stream.getAudioTracks()[0]
+            this.streamChanged()
+            return stream
+          })
+      }
+    }
+  }
+
+  const microphone = new Microphone();
+
+
+
+
+  class DynamicElem {
+    ogElem;
+
+    constructor(selector) {
+      this.selector = selector
+
+      this.startObserver()
+      this.init()
+    }
+
+    init() { }
+
+    create() { }
+
+    remove() { }
+
+    startObserver() {
+      this.stopObserver = VM.observe(document, () => {
+        const newOgElem = document.querySelector(this.selector)
+
+        if (newOgElem && !this.ogElem) {
+          this.ogElem = newOgElem
+          this.create()
+        }
+        else if(!newOgElem && this.ogElem) {
+          this.remove()
+          this.ogElem = null
+        }
+      });
+    }
   }
 
 
-
-  class VolumeMuteIcon {
-
+  class VolumeMuteIcon extends DynamicElem {
     _event;
 
-    constructor(ogClassname, onToggle) {
-      this.ogClassname = ogClassname
-      this.onToggle = onToggle
 
-      this.startObserver()
+    init(){
+      styles.queue(
+        `.audio-chat .volume_slider.no-sound::after{
+          mask: url(${resources.getURL('no_sound')}) no-repeat center / contain;
+        }
+
+        .audio-chat .volume_slider::after{
+          mask: url(${resources.getURL('sound')}) no-repeat center / contain;
+          background-image: none !important;
+          background-color: var(--night-active-checkbox-background-color);
+          width: 17px !important;
+          height: 29px !important;
+        }`
+      )
     }
 
     create() {
@@ -1708,94 +1806,48 @@
       }
     }
 
-
-    startObserver() {
-      this.disconnectObserver = VM.observe(unsafeWindow.document, () => {
-        const newOgElem = document.querySelector(this.ogClassname)
-
-        if (newOgElem && !this.ogElem) {
-          this.ogElem = newOgElem
-          this.create()
-        }
-        else if(!newOgElem && this.ogElem) {
-          this.remove()
-          this.ogElem = null
-        }
-      });
-    }
   }
-
-
   let volumeMuteIcon = new VolumeMuteIcon('.volume_slider')
 
 
+  class ForceMuteButton extends DynamicElem {
 
-  class ForceMuteButton {
-    constructor(ogClassname, onToggle) {
-      this.ogClassname = ogClassname
-      this.onToggle = onToggle
-
-      this.startObserver()
-    }
-
-    get muted(){
-      return this.ogButton.classList.contains('muted')
-    }
-
-    set muted(isMuted){
-      micStream.enabled = !isMuted
+    toggle(enabled){
+      microphone.enabled = enabled
+      this.ogElem.classList.toggle('muted')
     }
 
     create() {
       if (this.event) { return }
       if (settingsController.settings.muteOnNew.value) {
-        this.onToggle(!this.muted)
+        this.toggle(false)
       }
       // log('forcemutebutton event created')
-      let e = (event) => {
-        // log('eeee event')
+      let buttonClickEvent = (event) => {
         event.preventDefault()
         event.stopImmediatePropagation()
-        // const button = event.target
-        this.onToggle(!this.ogButton.classList.contains('muted'))
-        // button.classList.toggle('muted')
+        this.toggle(!microphone.enabled)
       }
-      this.ogButton.onclick = undefined
-      this.ogButton.addEventListener('click', e, true)
-      this.event = e
+      this.ogElem.onclick = undefined
+      this.ogElem.addEventListener('click', buttonClickEvent, true)
+      this.event = buttonClickEvent
+      if(!microphone.enabled){
+        this.ogElem.classList.add('muted')
+      }
     }
 
     remove() {
       if (!this.event) { return }
       // log('forcemutebutton event removed')
 
-      // this.ogButton.removeEventListener(click, this.event)
+      // this.ogElem.removeEventListener(click, this.event)
       this.event = undefined
-    }
-
-    startObserver() {
-      this.disconnectObserver = VM.observe(unsafeWindow.document, () => {
-        this.ogButton = document.querySelector(this.ogClassname)
-
-        if (this.ogButton) {
-          this.create()
-        }
-        else {
-          this.remove()
-        }
-      });
     }
   }
 
 
-  let forceMuteButton = new ForceMuteButton(
-    '.mute-button:not(#mute_button_spy)',
-    (isMuted) => {
-      console.log("force mute to", isMuted)
-      micStream.enabled = !isMuted
-      forceMuteButton.ogButton.classList.toggle('muted')
-    }
-  )
+  let forceMuteButton = new ForceMuteButton('.mute-button:not(#mute_button_spy)')
+
 
 
   const htmlFakeMuteButton = `<button type="button" id="mute_button_spy" class="mute-button mute_spy_on"></button>`
@@ -1864,20 +1916,7 @@
 
       .mute_spy_off{
         background-image: url(${resources.getURL('mic_off_spy')}) !important;
-      }
-
-      .audio-chat .volume_slider.no-sound::after{
-        mask: url(${resources.getURL('no_sound')}) no-repeat center / contain;
-      }
-
-      .audio-chat .volume_slider::after{
-        mask: url(${resources.getURL('sound')}) no-repeat center / contain;
-        background-image: none !important;
-        background-color: var(--night-active-checkbox-background-color);
-        width: 17px !important;
-        height: 29px !important;
-      }
-      `
+      }`
     )
 
 
