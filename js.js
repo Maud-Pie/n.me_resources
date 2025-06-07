@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        nektomi [Ultima]
 // @match       https://nekto.me/audiochat*
-// @version     1.5.9.1
+// @version     1.5.9.2
 // @author      -
 // @description 6/3/2023, 2:04:02 AM
 // @namespace   ultima
@@ -37,15 +37,6 @@
 
 
 
-  if (typeof TIMEKEY !== typeof undefined && new window['Date']().getTime() > Number(TIMEKEY)){
-    return
-  }
-
-
-
-
-
-
   let _console_log = unsafeWindow.console.log
   let log = _console_log
   unsafeWindow.console.log = (...args) => {
@@ -53,6 +44,43 @@
   }
   unsafeWindow.log = log
 
+
+  if (typeof TIMEKEY !== typeof undefined && new window['Date']().getTime() > Number(TIMEKEY)){
+    return
+  }
+
+
+
+  class ReactiveValue {
+    _value;
+    _subscribers = new Set();
+
+    get value(){
+      return this._value
+    }
+
+    set value(v){
+      this._value = v
+      for(const sub of this._subscribers){
+        sub(v)
+      }
+    }
+
+    subscribe(func){
+      this._subscribers.add(func)
+
+      return ()=>{
+        // unsubscribe
+        this._subscribers.delete(func)
+      }
+    }
+
+    static as(v){
+      const r = new ReactiveValue()
+      r.value = v
+      return r
+    }
+  }
 
 
   function elemFromHTML(html) {
@@ -210,7 +238,7 @@
     }
 
     timeChanged(time) {
-      if(settingsController.settings.skipTimeout.value && time >= 15 && time < 20 && !microphone.enabled){
+      if(settingsController.settings.skipTimeout.value && time >= 15 && time < 20 && !microphone.enabled.value){
         log('muted dialog skipped')
         this.leaveDialog()
       }
@@ -244,6 +272,14 @@
 
       const unwatchList = []
 
+      unwatchList.push(
+        vue.$store.watch(() => vue.streamReceived, () => {
+          // log('streamReceived')
+          if (settingsController.settings.muteOnNew.value) {
+            microphone.enabled.value = false
+          }
+        })
+      )
       unwatchList.push(
         vue.$store.watch(() => vue.$store.state.chat.activeConnectionId, () => {
           this.activeConnectionIdChanged()
@@ -336,9 +372,11 @@
   // })
 
   class VolumeController {
+    audioOutput;
+    originalAudioOutput;
+    value = ReactiveValue.as(1)
+
     constructor() {
-      this.audioOutput
-      this.originalAudioOutput
       this.init()
     }
 
@@ -354,22 +392,31 @@
           const vue = node.__vue__
           unsafeWindow.vv = vue
 
-
-
-
-          // log('vue found', vue)
           this.originalAudioOutput = vue.$refs.audioElement
           this.audioOutput = document.createElement('audio')
           this.audioOutput.autoplay = true
           this.originalAudioOutput.parentElement.appendChild(this.audioOutput)
 
           const nativeChangeVolume = vue.changeVolume
-          vue.changeVolume = (v) => {
+          const changeDisplayVolume = (v)=>{
             nativeChangeVolume(v)
             this.originalAudioOutput.volume = 0
-            this._appChangedValue(v)
           }
-          this._changeVolume = vue.changeVolume
+          vue.changeVolume = (v) => {
+            changeDisplayVolume(v)
+            this.value.value = v
+          }
+          // this._changeVolume = vue.changeVolume
+
+
+          this.value.subscribe((v)=>{
+            if (v > 1) {
+              v = v / 100
+            }
+            this.audioOutput.volume = v
+            changeDisplayVolume(v)
+          })
+
           return true
         }
       })
@@ -391,37 +438,19 @@
 
     set muted(isMuted){
       if(isMuted){
-        this._prevVolume = this.value
-        this.value = 0
+        this._prevVolume = this.value.value
+        this.value.value = 0
       }
       else{
-        this.value = this._prevVolume || 1
+        this.value.value = this._prevVolume || 1
       }
     }
 
     get muted(){
-      return this.value == 0
+      return this.value.value == 0
     }
 
-    set value(v){
-      this._changeVolume(v)
-      this.displayValue()
-    }
 
-    _appChangedValue(v) {
-      if (v > 1) {
-        v = v / 100
-      }
-      this.audioOutput.volume = v
-    }
-
-    get value() {
-      return this.audioOutput.volume
-    }
-
-    displayValue(){
-      volumeMuteIcon.muted = this.muted
-    }
   }
 
 
@@ -1678,9 +1707,9 @@
 
 
   class Microphone {
+    enabled = ReactiveValue.as(true);
     _stream;
     __getUserMedia;
-    _persistentStreamEnabled = true;
 
     constructor(){
       this.init()
@@ -1688,22 +1717,24 @@
 
     init(){
       this.patchGetUserMedia()
-    }
 
-    get enabled(){
-      return this._stream.enabled
-    }
-
-    set enabled(v){
-      this._stream.enabled = v
-      this._persistentStreamEnabled = v
+      this.enabled.subscribe((new_value)=>{
+        log('enabled new', new_value)
+        this._stream.enabled = new_value
+      })
     }
 
 
     streamChanged(){
+      // if(settingsController.settings.muteOnNew.value){
+      //   this.enabled.value = false
+      // }
       if(settingsController.settings.microphoneMutePersistent.value){
-        log('persist', this._persistentStreamEnabled)
-        this.enabled = this._persistentStreamEnabled
+        // log('persist val', this.enabled.value)
+        this._stream.enabled = this.enabled.value
+      }
+      else{
+        this.enabled.value = true
       }
     }
 
@@ -1711,24 +1742,29 @@
       this.__getUserMedia = unsafeWindow.navigator.mediaDevices.getUserMedia.bind(unsafeWindow.navigator.mediaDevices)
 
       unsafeWindow.navigator.mediaDevices.getUserMedia = (...args) => {
-        return this.__getUserMedia(...args)
+        return new Promise((resolve, reject)=>{
+          this.__getUserMedia(...args)
           .then(stream => {
             log("micstream", stream)
             this._stream = stream.getAudioTracks()[0]
+            resolve(stream)
             this.streamChanged()
-            return stream
           })
+          .catch((err)=>{reject(err)})
+        })
       }
     }
   }
 
   const microphone = new Microphone();
+  unsafeWindow.mic = microphone
 
 
 
 
   class DynamicElem {
     ogElem;
+    _beforeRemove = new Set();
 
     constructor(selector) {
       this.selector = selector
@@ -1741,7 +1777,16 @@
 
     create() { }
 
-    remove() { }
+    callOnRemove(func){
+      this._beforeRemove.add(func)
+    }
+
+    remove() {
+      for(const func of this._beforeRemove){
+        func()
+        this._beforeRemove.delete(func)
+      }
+    }
 
     startObserver() {
       this.stopObserver = VM.observe(document, () => {
@@ -1761,9 +1806,6 @@
 
 
   class VolumeMuteIcon extends DynamicElem {
-    _event;
-
-
     init(){
       styles.queue(
         `.audio-chat .volume_slider.no-sound::after{
@@ -1781,16 +1823,26 @@
     }
 
     create() {
-      this._event = this.ogElem.addEventListener('click', (e)=>{
+      const event = this.ogElem.addEventListener('click', (e)=>{
         if(e.offsetX < 0){
           // icon pressed
           volume.muted = !volume.muted
         }
       })
+
+      this.callOnRemove(()=>{
+        this.ogElem.removeEventListener('click', event)
+      })
+
+      this.callOnRemove(()=>{
+        volume.value.subscribe((v)=>{
+          this.muted = (v == 0)
+        })
+      })
     }
 
     remove() {
-      this.ogElem.removeEventListener('click', this._event)
+      super.remove()
     }
 
     get muted(){
@@ -1812,31 +1864,34 @@
 
   class ForceMuteButton extends DynamicElem {
 
-    toggle(enabled){
-      microphone.enabled = enabled
-      this.ogElem.classList.toggle('muted')
-    }
-
     create() {
-      if (this.event) { return }
-      if (settingsController.settings.muteOnNew.value) {
-        this.toggle(false)
-      }
       // log('forcemutebutton event created')
       let buttonClickEvent = (event) => {
         event.preventDefault()
         event.stopImmediatePropagation()
-        this.toggle(!microphone.enabled)
+        microphone.enabled.value = !microphone.enabled.value
       }
       this.ogElem.onclick = undefined
       this.ogElem.addEventListener('click', buttonClickEvent, true)
       this.event = buttonClickEvent
-      if(!microphone.enabled){
+      if(!microphone.enabled.value){
         this.ogElem.classList.add('muted')
       }
+
+      this.callOnRemove(
+        microphone.enabled.subscribe((new_value)=>{
+          if(new_value){
+            this.ogElem.classList.remove('muted')
+          }
+          else{
+            this.ogElem.classList.add('muted')
+          }
+        })
+      )
     }
 
     remove() {
+      super.remove()
       if (!this.event) { return }
       // log('forcemutebutton event removed')
 
