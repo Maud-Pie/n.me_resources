@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name        nektomi [Ultima]
 // @match       https://nekto.me/audiochat*
-// @version     1.5.9.2
+// @version     1.5.9.3
 // @author      -
 // @description 6/3/2023, 2:04:02 AM
 // @namespace   ultima
