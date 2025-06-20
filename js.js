@@ -5,7 +5,7 @@
 // @author      -
 // @description 6/3/2023, 2:04:02 AM
 // @namespace   ultima
-// @downloadURL https://raw.githubusercontent.com/Maud-Pie/n.me_resources/refs/heads/main/js.js
+// @downloadURL https://raw.githubusercontent.com/Maud-Pie/n.me_resources/refs/heads/main/js.js?v=2
 // @supportURL  -
 // @homepageURL -
 // @icon        https://nekto.me/audiochat/favicon.ico
